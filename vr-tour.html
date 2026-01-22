@@ -77,8 +77,7 @@
   webxr="referenceSpaceType: local-floor"
   vr-mode-ui="enabled: true"
   renderer="antialias: true"
-  raycaster="objects: .clickable"
-  cursor="rayOrigin: mouse">
+  raycaster="objects: .clickable">
 
   <!-- ASSETS -->
   <a-assets timeout="30000">
@@ -131,51 +130,31 @@
   <!-- SKY -->
   <a-sky id="sky" src="#pano1" rotation="0 90 0"></a-sky>
 
-  <!-- CAMERA RIG -->
-  <a-entity id="rig">
-    <a-entity
-      id="camera"
-      camera
-      look-controls="pointerLockEnabled: false; touchEnabled: false; hmdEnabled: true"
-      wasd-controls="enabled: false">
-      
+  <!-- CAMERA RIG (ROTATES WITH THUMBSTICK) -->
+  <a-entity id="rig" thumbstick-turn>
+    <a-entity id="camera"
+              camera
+              look-controls="pointerLockEnabled: false"
+              wasd-controls="enabled: false">
+
       <!-- Desktop cursor -->
-      <a-entity
-        cursor="rayOrigin: mouse"
-        raycaster="objects: .clickable"
-        geometry="primitive: ring; radiusInner: 0.015; radiusOuter: 0.025"
-        material="color: #4CC3D9; shader: flat"
-        position="0 0 -1">
+      <a-entity cursor="rayOrigin: mouse"
+                raycaster="objects: .clickable"
+                geometry="primitive: ring; radiusInner: 0.015; radiusOuter: 0.025"
+                material="color: #4CC3D9"
+                position="0 0 -1">
       </a-entity>
-      
+
     </a-entity>
   </a-entity>
 
-  <!-- VR CONTROLLERS WITH THUMBSTICK SUPPORT -->
-  <a-entity 
-    id="rightController" 
-    laser-controls="hand: right; model: false"
-    raycaster="objects: .clickable; far: 100"
-    line="color: #4CC3D9; opacity: 0.6">
-    
-    <!-- Controller model for VR -->
-    <a-entity oculus-touch-controls="hand: right"></a-entity>
-    <a-entity vive-controls="hand: right"></a-entity>
-    <a-entity windows-motion-controls="hand: right"></a-entity>
-    
+  <!-- VR CONTROLLERS -->
+  <a-entity laser-controls="hand: right"
+            raycaster="objects: .clickable; far: 100">
   </a-entity>
 
-  <a-entity 
-    id="leftController" 
-    laser-controls="hand: left; model: false"
-    raycaster="objects: .clickable; far: 100"
-    line="color: #4CC3D9; opacity: 0.3">
-    
-    <!-- Controller model for VR -->
-    <a-entity oculus-touch-controls="hand: left"></a-entity>
-    <a-entity vive-controls="hand: left"></a-entity>
-    <a-entity windows-motion-controls="hand: left"></a-entity>
-    
+  <a-entity laser-controls="hand: left"
+            raycaster="objects: .clickable; far: 100">
   </a-entity>
 
   <!-- HOTSPOTS -->
@@ -184,13 +163,73 @@
 </a-scene>
 
 <script>
+/* ===============================
+   THUMBSTICK TURN COMPONENT
+================================ */
+AFRAME.registerComponent("thumbstick-turn", {
+  schema: { speed: { default: 80 } },
+
+  init() {
+    this.yaw = 0;
+    this.axisX = 0;
+    this.isInVR = false;
+  },
+
+  tick(time, delta) {
+    // Only apply thumbstick rotation when in VR mode
+    if (!this.isInVR) return;
+    
+    const deadZone = 0.15;
+    if (Math.abs(this.axisX) < deadZone) return;
+
+    this.yaw -= this.axisX * this.data.speed * (delta / 1000);
+    this.el.object3D.rotation.y = THREE.MathUtils.degToRad(this.yaw);
+  },
+
+  play() {
+    const sceneEl = this.el.sceneEl;
+    
+    // Setup VR enter/exit listeners
+    sceneEl.addEventListener("enter-vr", () => {
+      console.log("VR mode entered - thumbstick controls activated");
+      this.isInVR = true;
+      document.body.classList.add("vr-mode");
+      
+      // Setup thumbstick listeners for both controllers
+      const controllers = document.querySelectorAll("[laser-controls]");
+      controllers.forEach(ctrl => {
+        ctrl.addEventListener("thumbstickmoved", e => {
+          this.axisX = e.detail.x;
+        });
+        
+        ctrl.addEventListener("thumbstickdown", () => {
+          console.log("Thumbstick clicked");
+        });
+      });
+    });
+
+    sceneEl.addEventListener("exit-vr", () => {
+      console.log("VR mode exited");
+      this.isInVR = false;
+      this.axisX = 0;
+      document.body.classList.remove("vr-mode");
+    });
+
+    // Also handle controller connection events
+    sceneEl.addEventListener("controllerconnected", (e) => {
+      console.log("Controller connected:", e.detail.name);
+    });
+  }
+});
+
+/* ===============================
+   TOUR LOGIC
+================================ */
 const scene = document.querySelector("a-scene");
 const sky = document.getElementById("sky");
-const camera = document.getElementById("camera");
+const camera = document.querySelector("#camera");
 const hotspotsContainer = document.getElementById("hotspots");
 const loadingOverlay = document.getElementById("loadingOverlay");
-const rightController = document.getElementById("rightController");
-const leftController = document.getElementById("leftController");
 
 let isLoading = false;
 let currentNodeId = "point1";
@@ -600,34 +639,6 @@ const nodes = {
 };
 
 /* ===========================
-   THUMBSTICK LOOK CONTROLS
-=========================== */
-function setupThumbstickControls() {
-  // Listen for thumbstick events on controllers
-  [leftController, rightController].forEach(controller => {
-    if (!controller) return;
-    
-    // Listen for thumbstick moves
-    controller.addEventListener('thumbstickmoved', (event) => {
-      const { x, y } = event.detail;
-      
-      // If thumbstick is moved significantly, rotate camera
-      if (Math.abs(x) > 0.1 || Math.abs(y) > 0.1) {
-        const rotation = camera.getAttribute('rotation');
-        const newYaw = rotation.y + (x * 2); // Adjust sensitivity
-        const newPitch = Math.max(-90, Math.min(90, rotation.x - (y * 1.5)));
-        
-        camera.setAttribute('rotation', {
-          x: newPitch,
-          y: newYaw,
-          z: rotation.z
-        });
-      }
-    });
-  });
-}
-
-/* ===========================
    LOAD NODE
 =========================== */
 async function loadNode(nodeId) {
@@ -698,9 +709,6 @@ function buildHotspots(node) {
    INIT
 =========================== */
 scene.addEventListener("loaded", () => {
-  // Setup thumbstick controls
-  setupThumbstickControls();
-  
   // Check for URL parameter
   const urlParams = new URLSearchParams(window.location.search);
   const imageKey = urlParams.get('image');
@@ -717,18 +725,6 @@ scene.addEventListener("loaded", () => {
   
   // Default load
   loadNode("point1");
-});
-
-/* ===========================
-   VR MODE DETECTION
-=========================== */
-scene.addEventListener("enter-vr", () => {
-  document.body.classList.add("vr-mode");
-  console.log("VR mode entered - thumbsticks should work");
-});
-
-scene.addEventListener("exit-vr", () => {
-  document.body.classList.remove("vr-mode");
 });
 
 /* ===========================
@@ -753,6 +749,20 @@ document.addEventListener('keydown', (e) => {
     exitVRTour();
   }
 });
+
+// Add click sound for better feedback
+const clickSound = new Audio('https://cdn.aframe.io/360-image-gallery-boilerplate/audio/click.ogg');
+
+// Enhance cursor interaction
+const cursor = document.querySelector('[cursor]');
+if (cursor) {
+  cursor.addEventListener('click', (evt) => {
+    if (evt.detail.intersectedEl && evt.detail.intersectedEl.classList.contains('clickable')) {
+      clickSound.currentTime = 0;
+      clickSound.play().catch(e => console.log("Audio play failed:", e));
+    }
+  });
+}
 </script>
 </body>
 </html>
