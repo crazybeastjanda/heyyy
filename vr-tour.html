@@ -131,7 +131,7 @@
   <a-sky id="sky" src="#pano1" rotation="0 90 0"></a-sky>
 
   <!-- CAMERA RIG (ROTATES WITH THUMBSTICK) -->
-  <a-entity id="rig" thumbstick-turn>
+  <a-entity id="rig" thumbstick-turn="speed: 80; deadzone: 0.15">
     <a-entity id="camera"
               camera
               look-controls="pointerLockEnabled: false"
@@ -164,61 +164,86 @@
 
 <script>
 /* ===============================
-   THUMBSTICK TURN COMPONENT
+   THUMBSTICK TURN COMPONENT (FIXED VERSION)
 ================================ */
 AFRAME.registerComponent("thumbstick-turn", {
-  schema: { speed: { default: 80 } },
+  schema: {
+    speed: { default: 80 },     // degrees per second
+    deadzone: { default: 0.15 } // stick center tolerance
+  },
 
   init() {
     this.yaw = 0;
     this.axisX = 0;
-    this.isInVR = false;
-  },
 
-  tick(time, delta) {
-    // Only apply thumbstick rotation when in VR mode
-    if (!this.isInVR) return;
+    this.onThumbstickMoved = (evt) => {
+      const x = evt.detail.x ?? 0;
+
+      // Apply deadzone - CRITICAL: force to 0 when in deadzone
+      if (Math.abs(x) < this.data.deadzone) {
+        this.axisX = 0;
+      } else {
+        this.axisX = x;
+      }
+      
+      // Debug logging
+      // console.log("Thumbstick moved:", x, "-> axisX:", this.axisX);
+    };
     
-    const deadZone = 0.15;
-    if (Math.abs(this.axisX) < deadZone) return;
-
-    this.yaw -= this.axisX * this.data.speed * (delta / 1000);
-    this.el.object3D.rotation.y = THREE.MathUtils.degToRad(this.yaw);
+    // Clean up function
+    this.removeEventListeners = () => {
+      const controllers = document.querySelectorAll("[laser-controls]");
+      controllers.forEach(ctrl => {
+        ctrl.removeEventListener("thumbstickmoved", this.onThumbstickMoved);
+      });
+    };
   },
 
   play() {
-    const sceneEl = this.el.sceneEl;
-    
-    // Setup VR enter/exit listeners
-    sceneEl.addEventListener("enter-vr", () => {
-      console.log("VR mode entered - thumbstick controls activated");
-      this.isInVR = true;
-      document.body.classList.add("vr-mode");
-      
-      // Setup thumbstick listeners for both controllers
+    // Add listeners when entering VR
+    this.el.sceneEl.addEventListener("enter-vr", () => {
+      console.log("VR entered - setting up thumbstick listeners");
       const controllers = document.querySelectorAll("[laser-controls]");
       controllers.forEach(ctrl => {
-        ctrl.addEventListener("thumbstickmoved", e => {
-          this.axisX = e.detail.x;
-        });
-        
-        ctrl.addEventListener("thumbstickdown", () => {
-          console.log("Thumbstick clicked");
-        });
+        ctrl.addEventListener("thumbstickmoved", this.onThumbstickMoved);
       });
+      
+      // Also add listener for controller connected events
+      this.el.sceneEl.addEventListener("controllerconnected", (e) => {
+        console.log("Controller connected, adding thumbstick listener");
+        const controller = e.detail;
+        if (controller) {
+          controller.addEventListener("thumbstickmoved", this.onThumbstickMoved);
+        }
+      });
+      
+      // Add VR mode class to body
+      document.body.classList.add("vr-mode");
     });
 
-    sceneEl.addEventListener("exit-vr", () => {
-      console.log("VR mode exited");
-      this.isInVR = false;
-      this.axisX = 0;
+    // Remove listeners when exiting VR
+    this.el.sceneEl.addEventListener("exit-vr", () => {
+      console.log("VR exited - cleaning up thumbstick listeners");
+      this.removeEventListeners();
+      this.axisX = 0; // Reset axis to prevent drift
       document.body.classList.remove("vr-mode");
     });
+  },
 
-    // Also handle controller connection events
-    sceneEl.addEventListener("controllerconnected", (e) => {
-      console.log("Controller connected:", e.detail.name);
-    });
+  pause() {
+    // Clean up listeners when component is paused
+    this.removeEventListeners();
+  },
+
+  tick(time, delta) {
+    // Only rotate if axisX is not 0
+    if (this.axisX === 0) return;
+
+    const deltaYaw = this.axisX * this.data.speed * (delta / 1000);
+    this.yaw -= deltaYaw;
+    
+    // Apply rotation to the rig (camera parent)
+    this.el.object3D.rotation.y = THREE.MathUtils.degToRad(this.yaw);
   }
 });
 
@@ -655,6 +680,13 @@ async function loadNode(nodeId) {
   
   // Rotate camera to face the correct direction
   camera.setAttribute("rotation", `0 ${node.yaw} 0`);
+  
+  // Reset rig rotation when loading new node
+  const rig = document.getElementById('rig');
+  if (rig && rig.components['thumbstick-turn']) {
+    rig.components['thumbstick-turn'].yaw = 0;
+    rig.object3D.rotation.y = 0;
+  }
 
   // Build hotspots for this node
   buildHotspots(node);
@@ -752,6 +784,7 @@ document.addEventListener('keydown', (e) => {
 
 // Add click sound for better feedback
 const clickSound = new Audio('https://cdn.aframe.io/360-image-gallery-boilerplate/audio/click.ogg');
+clickSound.volume = 0.5;
 
 // Enhance cursor interaction
 const cursor = document.querySelector('[cursor]');
