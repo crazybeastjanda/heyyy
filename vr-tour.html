@@ -101,6 +101,28 @@
     .vr-mode #exitVRBtn {
       display: none;
     }
+    
+    /* Controller tooltip */
+    .controller-tooltip {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 15px 25px;
+      border-radius: 10px;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      z-index: 9998;
+      text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      display: none;
+    }
+    
+    .vr-mode .controller-tooltip {
+      display: block;
+    }
   </style>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -116,9 +138,14 @@
   <button id="exitVRBtn">
     <i class="fas fa-sign-out-alt"></i> Exit VR Tour
   </button>
+  
+  <!-- Controller Tooltip -->
+  <div class="controller-tooltip" id="controllerTooltip">
+    <i class="fas fa-gamepad"></i> Use controller trigger to select hotspots
+  </div>
 
   <a-scene webxr="referenceSpaceType: local-floor" vr-mode-ui="enabled: true" cursor="rayOrigin: mouse" 
-    raycaster="objects: .clickable, .arrow-target">
+    raycaster="objects: .clickable; far: 50">
 
     <!-- All images lazy loaded -->
     <a-assets timeout="30000">
@@ -169,8 +196,6 @@
 
       <!-- Navigation Arrow -->
       <img id="navArrow" src="Assets/red-pin.avif" crossorigin="anonymous" preload="auto">
-      <!-- Cursor Arrow -->
-      <img id="cursorArrowImg" src="Assets/arrow.png.png" crossorigin="anonymous" preload="auto">
     </a-assets>
 
     <!-- SKY -->
@@ -179,43 +204,58 @@
     <!-- Camera rig -->
     <a-entity id="rig" position="0 0 0">
       <!-- camera needs an id so script can rotate it -->
-      <a-entity id="camera" camera look-controls>
-        <!-- VR cursor for navigation -->
-        <a-entity cursor="rayOrigin: entity; fuse: true; fuseTimeout: 2000;" 
-          raycaster="objects: .clickable, .arrow-target"
+      <a-entity id="camera" camera look-controls="pointerLockEnabled: false">
+        <!-- Mouse cursor for desktop -->
+        <a-entity cursor="rayOrigin: mouse; fuse: false;" 
+          raycaster="objects: .clickable; far: 50"
           geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
           material="color: #4CC3D9; shader: flat"
           position="0 0 -1">
         </a-entity>
+        
+        <!-- VR cursor for VR mode (will be hidden in desktop) -->
+        <a-entity cursor="rayOrigin: entity; fuse: false;" 
+          raycaster="objects: .clickable; far: 50"
+          geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.02"
+          material="color: #FF3366; shader: flat"
+          position="0 0 -0.5"
+          visible="false">
+        </a-entity>
+      </a-entity>
+    </a-entity>
+    
+    <!-- VR Controllers -->
+    <a-entity id="leftHand" 
+              laser-controls="hand: left" 
+              raycaster="objects: .clickable; far: 50"
+              line="color: #4CC3D9; opacity: 0.5">
+      <!-- Controller model -->
+      <a-entity vive-controls="hand: left"
+                oculus-touch-controls="hand: left"
+                windows-motion-controls="hand: left"
+                daydream-controls="hand: left"
+                generic-tracked-controller-controls="hand: left">
+      </a-entity>
+    </a-entity>
+    
+    <a-entity id="rightHand" 
+              laser-controls="hand: right" 
+              raycaster="objects: .clickable; far: 50"
+              line="color: #4CC3D9; opacity: 0.5">
+      <!-- Controller model -->
+      <a-entity vive-controls="hand: right"
+                oculus-touch-controls="hand: right"
+                windows-motion-controls="hand: right"
+                daydream-controls="hand: right"
+                generic-tracked-controller-controls="hand: right">
       </a-entity>
     </a-entity>
 
     <!-- Hotspot container -->
     <a-entity id="hotspots"></a-entity>
     
-    <!-- Invisible ground plane for raycaster intersection -->
-    <a-plane id="groundPlane" 
-      position="0 -1.5 0" 
-      rotation="-90 0 0" 
-      width="1000" 
-      height="1000" 
-      visible="false"
-      class="arrow-target"></a-plane>
-    
-    <!-- Cursor-follow arrow (flat on ground) -->
-    <a-entity id="cursorArrow" position="0 -1.5 -5" rotation="-90 0 0" class="clickable">
-      <a-image src="#cursorArrowImg" 
-        scale="1.5 1.5 1.5"
-        material="shader: flat; transparent: true; alphaTest: 0.01;"
-        position="0 0 0">
-        <a-animation attribute="position" 
-          dur="1500" 
-          to="0 0 -0.3" 
-          direction="alternate" 
-          repeat="indefinite"
-          easing="ease-in-out"></a-animation>
-      </a-image>
-    </a-entity>
+    <!-- Sound effects -->
+    <a-asset-item id="clickSound" src="https://cdn.aframe.io/360-image-gallery-boilerplate/audio/click.ogg"></a-asset-item>
     
   </a-scene>
 
@@ -225,14 +265,16 @@
     const camera = document.querySelector("#camera");
     const hotspotsContainer = document.querySelector("#hotspots");
     const rig = document.querySelector("#rig");
-    const cursorArrow = document.querySelector("#cursorArrow");
-    const groundPlane = document.querySelector("#groundPlane");
     const exitVRBtn = document.getElementById("exitVRBtn");
     const loadingOverlay = document.getElementById("loadingOverlay");
+    const controllerTooltip = document.getElementById("controllerTooltip");
     let canvas = null;
     let raycaster = null;
     let assetsManager = null;
     let isLoading = false;
+    let isInVR = false;
+    let leftController = null;
+    let rightController = null;
 
     // Track loaded images to prevent duplicate loading
     const loadedImages = new Set();
@@ -255,13 +297,28 @@
 
     // Detect VR mode to hide/show button appropriately
     scene.addEventListener("enter-vr", () => {
-      console.log("VR mode entered - hiding exit button");
+      console.log("VR mode entered");
       document.body.classList.add("vr-mode");
+      isInVR = true;
+      setupVRControllers();
+      
+      // Show VR cursor and hide mouse cursor
+      const mouseCursor = camera.querySelector('[rayorigin="mouse"]');
+      const vrCursor = camera.querySelector('[rayorigin="entity"]');
+      if (mouseCursor) mouseCursor.setAttribute('visible', 'false');
+      if (vrCursor) vrCursor.setAttribute('visible', 'true');
     });
     
     scene.addEventListener("exit-vr", () => {
-      console.log("VR mode exited - showing exit button");
+      console.log("VR mode exited");
       document.body.classList.remove("vr-mode");
+      isInVR = false;
+      
+      // Show mouse cursor and hide VR cursor
+      const mouseCursor = camera.querySelector('[rayorigin="mouse"]');
+      const vrCursor = camera.querySelector('[rayorigin="entity"]');
+      if (mouseCursor) mouseCursor.setAttribute('visible', 'true');
+      if (vrCursor) vrCursor.setAttribute('visible', 'false');
     });
 
     // Scene loaded handler
@@ -270,8 +327,12 @@
       raycaster = scene.systems.raycaster;
       assetsManager = scene.assets;
       
-      // Initialize cursor arrow system
-      initCursorArrow();
+      // Get controller references
+      leftController = document.getElementById('leftHand');
+      rightController = document.getElementById('rightHand');
+      
+      // Setup controller event listeners
+      setupControllerEvents();
       
       // Check if we should load a specific image from URL parameter
       const urlParams = new URLSearchParams(window.location.search);
@@ -288,6 +349,73 @@
       }
     });
 
+    function setupVRControllers() {
+      console.log("Setting up VR controllers...");
+      
+      // Add controller-specific cursor
+      if (leftController) {
+        leftController.setAttribute('cursor', 'rayOrigin: entity; fuse: false;');
+        leftController.setAttribute('raycaster', 'objects: .clickable; far: 50');
+        leftController.setAttribute('line', 'color: #4CC3D9; opacity: 0.5');
+      }
+      
+      if (rightController) {
+        rightController.setAttribute('cursor', 'rayOrigin: entity; fuse: false;');
+        rightController.setAttribute('raycaster', 'objects: .clickable; far: 50');
+        rightController.setAttribute('line', 'color: #4CC3D9; opacity: 0.5');
+      }
+    }
+
+    function setupControllerEvents() {
+      // Listen for trigger events on controllers
+      const controllers = [leftController, rightController];
+      
+      controllers.forEach((controller, index) => {
+        if (!controller) return;
+        
+        // Listen for triggerdown event (when trigger is pressed)
+        controller.addEventListener('triggerdown', (evt) => {
+          if (isLoading) return;
+          
+          // Get the intersected element
+          const intersections = evt.detail.intersections;
+          if (intersections && intersections.length > 0) {
+            const intersectedEl = intersections[0].object.el;
+            
+            // Check if it's a hotspot
+            if (intersectedEl.classList.contains('clickable')) {
+              console.log(`Controller ${index} clicked hotspot`);
+              
+              // Get the target from the hotspot's data attribute
+              const target = intersectedEl.getAttribute('data-target');
+              if (target) {
+                loadNode(target);
+              }
+            }
+          }
+        });
+        
+        // Add animation on trigger press
+        controller.addEventListener('triggerdown', () => {
+          controller.setAttribute('animation', {
+            property: 'scale',
+            to: '0.9 0.9 0.9',
+            dur: 100,
+            easing: 'easeOutQuad'
+          });
+        });
+        
+        controller.addEventListener('triggerup', () => {
+          controller.setAttribute('animation', {
+            property: 'scale',
+            to: '1 1 1',
+            dur: 100,
+            easing: 'easeOutQuad'
+          });
+        });
+      });
+    }
+
     function hideLoadingOverlay() {
       if (loadingOverlay) {
         loadingOverlay.classList.add('fade-out');
@@ -300,23 +428,6 @@
     // current node id tracker
     let currentNodeId = "point1";
     let extraYaw = 0;
-
-    // Navigation animation state
-    let isNavigating = false;
-    let navigationStartTime = 0;
-    let navigationDuration = 500;
-    let navigationStartPos = { x: 0, y: 0, z: 0 };
-    let navigationEndPos = { x: 0, y: 0, z: 0 };
-    let navigationTargetNodeId = null;
-    let navigationYaw = 0;
-
-    // Hotspot configuration storage
-    let hotspotConfigs = [];
-    let currentHotspotDirections = [];
-
-    // Arrow alignment detection
-    let currentAlignedTarget = null;
-    const ALIGNMENT_THRESHOLD = 45;
 
     // All config in one object: pano + base yaw + hotspots + imageKey
     const nodes = {
@@ -713,28 +824,6 @@
       },
     };
 
-    // Helper: Calculate yaw from position string
-    function positionToYaw(positionStr) {
-      const parts = positionStr.trim().split(/\s+/);
-      if (parts.length !== 3) return 0;
-      const x = parseFloat(parts[0]) || 0;
-      const z = parseFloat(parts[2]) || 0;
-      return Math.atan2(x, -z) * (180 / Math.PI);
-    }
-
-    // Helper: Normalize angle to -180 to 180 range
-    function normalizeAngle(angle) {
-      while (angle > 180) angle -= 360;
-      while (angle < -180) angle += 360;
-      return angle;
-    }
-
-    // Helper: Calculate angle difference
-    function angleDifference(angle1, angle2) {
-      const diff = normalizeAngle(angle1 - angle2);
-      return Math.abs(diff);
-    }
-
     // Preload specific image
     function preloadImage(imageId) {
       return new Promise((resolve, reject) => {
@@ -770,191 +859,6 @@
       });
     }
 
-    // Initialize cursor-follow arrow system
-    function initCursorArrow() {
-      const GROUND_HEIGHT = -1.5;
-      const MIN_ARROW_DISTANCE = 3;
-      const mouse = new THREE.Vector2(0, 0);
-      let currentArrowYaw = 0;
-      let isVRMode = false;
-      
-      // Detect VR mode
-      scene.addEventListener("enter-vr", () => {
-        isVRMode = true;
-        console.log("VR mode entered");
-      });
-      
-      scene.addEventListener("exit-vr", () => {
-        isVRMode = false;
-        console.log("VR mode exited");
-      });
-      
-      // Track mouse position (for desktop mode)
-      canvas.addEventListener("mousemove", (event) => {
-        if (!isVRMode) {
-          mouse.x = (event.clientX / canvas.clientWidth) * 2 - 1;
-          mouse.y = -(event.clientY / canvas.clientHeight) * 2 + 1;
-        }
-      });
-      
-      // Add click handler for navigation (on arrow and scene)
-      cursorArrow.addEventListener("click", handleArrowClick);
-      scene.addEventListener("click", handleArrowClick);
-      
-      // VR gaze-based click (fuse timeout)
-      cursorArrow.addEventListener("fusing", () => {
-        if (isVRMode) {
-          console.log("VR fuse detected on arrow");
-          handleArrowClick();
-        }
-      });
-      
-      // Also handle click events in VR (controller clicks)
-      cursorArrow.addEventListener("click", (evt) => {
-        if (isVRMode && currentAlignedTarget) {
-          handleArrowClick(evt);
-        }
-      });
-      
-      function handleArrowClick(event) {
-        if (isNavigating || isLoading) {
-          console.log("Already navigating or loading, ignoring click");
-          return;
-        }
-        
-        console.log("Click detected! Arrow yaw:", currentArrowYaw.toFixed(1) + "°");
-        console.log("Current aligned target:", currentAlignedTarget);
-        console.log("Available hotspots:", currentHotspotDirections.map(h => h.target + " @ " + h.yaw.toFixed(1) + "°"));
-        
-        if (currentAlignedTarget) {
-          console.log("✓ Navigating to:", currentAlignedTarget, "from:", currentNodeId);
-          loadNode(currentAlignedTarget);
-        } else {
-          console.log("✗ No target aligned. Try moving cursor closer to a navigation point.");
-        }
-      }
-      
-      // Update arrow based on raycaster intersection with ground plane
-      function updateArrow() {
-        // Get camera object
-        const cameraObj = camera.getObject3D("camera");
-        if (!cameraObj) return;
-        
-        let raycasterObj;
-        let intersectionPoint;
-        
-        if (isVRMode) {
-          // VR mode: Use camera forward direction (gaze)
-          const cameraWorldPos = new THREE.Vector3();
-          cameraObj.getWorldPosition(cameraWorldPos);
-          
-          // Get camera forward direction
-          const forward = new THREE.Vector3(0, 0, -1);
-          forward.applyQuaternion(cameraObj.quaternion);
-          
-          // Create ray from camera forward
-          raycasterObj = new THREE.Raycaster(cameraWorldPos, forward);
-        } else {
-          // Desktop mode: Use mouse position
-          raycasterObj = new THREE.Raycaster();
-          raycasterObj.setFromCamera(mouse, cameraObj);
-        }
-        
-        // Intersect with ground plane
-        const groundMesh = groundPlane.getObject3D("mesh");
-        if (groundMesh) {
-          const intersects = raycasterObj.intersectObject(groundMesh);
-          
-          if (intersects.length > 0) {
-            // Get camera world position
-            const cameraWorldPos = new THREE.Vector3();
-            cameraObj.getWorldPosition(cameraWorldPos);
-            
-            // Get intersection point on ground plane
-            intersectionPoint = intersects[0].point;
-            
-            // Calculate direction from camera to intersection
-            const direction = new THREE.Vector3()
-              .subVectors(intersectionPoint, cameraWorldPos)
-              .normalize();
-            
-            // Project direction onto ground plane (flatten Y component)
-            const groundDirection = new THREE.Vector3(direction.x, 0, direction.z).normalize();
-            
-            // Use actual intersection distance, but ensure minimum distance for visibility
-            const distanceToIntersection = cameraWorldPos.distanceTo(intersectionPoint);
-            const arrowDistance = Math.max(distanceToIntersection, MIN_ARROW_DISTANCE);
-            
-            // Position arrow along ground direction
-            const arrowPosition = new THREE.Vector3()
-              .copy(cameraWorldPos)
-              .add(groundDirection.multiplyScalar(arrowDistance));
-            arrowPosition.y = GROUND_HEIGHT;
-            
-            // Calculate yaw angle using atan2 for full 360-degree rotation
-            const dx = arrowPosition.x - cameraWorldPos.x;
-            const dz = arrowPosition.z - cameraWorldPos.z;
-            currentArrowYaw = Math.atan2(dx, -dz) * (180 / Math.PI);
-            
-            // Update arrow position (flat on ground: X=-90)
-            cursorArrow.setAttribute("position", `${arrowPosition.x} ${GROUND_HEIGHT} ${arrowPosition.z}`);
-            cursorArrow.setAttribute("rotation", `-90 0 0`);
-            
-            // Rotate the arrow image itself to point in the direction of movement
-            const arrowImage = cursorArrow.querySelector("a-image");
-            if (arrowImage) {
-              // Arrow should point in the direction it's moving (yaw rotation)
-              arrowImage.setAttribute("rotation", `0 0 ${currentArrowYaw}`);
-            }
-            
-            // Check alignment with hotspot directions
-            checkHotspotAlignment(currentArrowYaw);
-          }
-        }
-      }
-      
-      // Check if arrow direction aligns with any hotspot
-      function checkHotspotAlignment(arrowYaw) {
-        let alignedTarget = null;
-        let minDifference = ALIGNMENT_THRESHOLD;
-        let closestHotspot = null;
-        
-        currentHotspotDirections.forEach(hotspot => {
-          // Compare arrow yaw with hotspot yaw
-          const diff = angleDifference(arrowYaw, hotspot.yaw);
-          if (diff < minDifference) {
-            minDifference = diff;
-            alignedTarget = hotspot.target;
-            closestHotspot = hotspot;
-          }
-        });
-        
-        // Update aligned target
-        if (alignedTarget !== currentAlignedTarget) {
-          currentAlignedTarget = alignedTarget;
-          // Visual feedback: scale and cursor change
-          const arrowImage = cursorArrow.querySelector("a-image");
-          if (arrowImage) {
-            if (alignedTarget) {
-              arrowImage.setAttribute("scale", "1.8 1.8 1.8");
-              if (canvas) canvas.style.cursor = "pointer";
-              console.log("✓ Arrow aligned with:", alignedTarget, "| Arrow:", arrowYaw.toFixed(1) + "°", "| Hotspot:", closestHotspot.yaw.toFixed(1) + "°", "| Diff:", minDifference.toFixed(1) + "°");
-            } else {
-              arrowImage.setAttribute("scale", "1.5 1.5 1.5");
-              if (canvas) canvas.style.cursor = "default";
-            }
-          }
-        }
-      }
-      
-      // Continuous update loop
-      function tick() {
-        updateArrow();
-        requestAnimationFrame(tick);
-      }
-      tick();
-    }
-
     // set sky rotation based on node yaw + extraYaw
     function updateSkyRotation() {
       const node = nodes[currentNodeId];
@@ -962,26 +866,78 @@
       sky.setAttribute("rotation", `0 ${-(base + extraYaw)} 0`);
     }
 
-    // Build hotspot directions for cursor arrow navigation
+    // Build hotspots for the current node
     function buildHotspots(nodeId) {
       hotspotsContainer.innerHTML = "";
-      currentHotspotDirections = [];
       const node = nodes[nodeId];
       if (!node || !node.hotspots) return;
 
       node.hotspots.forEach(conf => {
-        // Calculate hotspot yaw from position
-        const hotspotYaw = positionToYaw(conf.position);
+        const hotspot = document.createElement("a-image");
+        hotspot.setAttribute("src", "#navArrow");
+        hotspot.setAttribute("position", conf.position);
+        hotspot.setAttribute("rotation", conf.rotation);
+        hotspot.setAttribute("scale", conf.scale);
+        hotspot.setAttribute("class", "clickable");
+        hotspot.setAttribute("data-target", conf.target); // Store target in data attribute
         
-        // Store hotspot direction for alignment detection
-        currentHotspotDirections.push({
-          yaw: hotspotYaw,
-          target: conf.target,
-          id: conf.id
+        // Add animation for visual feedback
+        hotspot.setAttribute("animation", {
+          property: "scale",
+          from: conf.scale,
+          to: parseFloat(conf.scale.split(' ')[0]) * 1.2 + " " + 
+               parseFloat(conf.scale.split(' ')[1]) * 1.2 + " " + 
+               parseFloat(conf.scale.split(' ')[2]) * 1.2,
+          dir: "alternate",
+          dur: 1000,
+          loop: true,
+          easing: "easeInOutSine"
         });
+        
+        // Add hover effect for desktop
+        hotspot.addEventListener("mouseenter", () => {
+          if (!isLoading && !isInVR) {
+            hotspot.setAttribute("animation", {
+              property: "scale",
+              to: parseFloat(conf.scale.split(' ')[0]) * 1.5 + " " + 
+                  parseFloat(conf.scale.split(' ')[1]) * 1.5 + " " + 
+                  parseFloat(conf.scale.split(' ')[2]) * 1.5,
+              dur: 200,
+              easing: "easeOutQuad"
+            });
+          }
+        });
+        
+        hotspot.addEventListener("mouseleave", () => {
+          if (!isLoading && !isInVR) {
+            hotspot.setAttribute("animation", {
+              property: "scale",
+              to: conf.scale,
+              dur: 200,
+              easing: "easeOutQuad"
+            });
+          }
+        });
+        
+        // Add click event for desktop
+        hotspot.addEventListener("click", (evt) => {
+          if (!isLoading && !isInVR) {
+            evt.stopPropagation();
+            loadNode(conf.target);
+          }
+        });
+        
+        // Add VR interaction
+        hotspot.addEventListener("mousedown", (evt) => {
+          if (isInVR) {
+            evt.stopPropagation();
+          }
+        });
+        
+        hotspotsContainer.appendChild(hotspot);
       });
       
-      console.log("Built hotspots for", nodeId, ":", currentHotspotDirections.map(h => h.target + " @ " + h.yaw.toFixed(1) + "°"));
+      console.log("Built hotspots for", nodeId);
     }
 
     // central function to switch nodes (panorama)
@@ -996,8 +952,6 @@
 
       isLoading = true;
       currentNodeId = nodeId;
-      currentAlignedTarget = null;
-      isNavigating = false;
       
       // Show loading overlay
       if (!loadedImages.has(node.skyId)) {
@@ -1020,12 +974,6 @@
 
         // build hotspots for the newly loaded node
         buildHotspots(nodeId);
-        
-        // Reset arrow scale
-        const arrowImage = cursorArrow.querySelector("a-image");
-        if (arrowImage) {
-          arrowImage.setAttribute("scale", "1.5 1.5 1.5");
-        }
 
         console.log("✓ Now at:", currentNodeId, "with imageKey:", node.imageKey);
       } catch (error) {
@@ -1077,6 +1025,5 @@
     // The scene initialization happens in the scene.loaded event handler
   </script>
 </body>
-
 
 </html>
