@@ -8,9 +8,6 @@
   <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 
-  <!-- Joystick Look Controls (REQUIRED for thumbstick rotation) -->
-  <script src="https://cdn.jsdelivr.net/npm/aframe-joystick-look-controls@1.1.0/dist/aframe-joystick-look-controls.min.js"></script>
-
   <style>
     html, body {
       margin: 0;
@@ -80,7 +77,8 @@
   webxr="referenceSpaceType: local-floor"
   vr-mode-ui="enabled: true"
   renderer="antialias: true"
-  raycaster="objects: .clickable">
+  raycaster="objects: .clickable"
+  cursor="rayOrigin: mouse">
 
   <!-- ASSETS -->
   <a-assets timeout="30000">
@@ -138,11 +136,10 @@
     <a-entity
       id="camera"
       camera
-      look-controls="pointerLockEnabled: false"
-      joystick-look-controls="enabled: true; turnSpeed: 2.2"
+      look-controls="pointerLockEnabled: false; touchEnabled: false; hmdEnabled: true"
       wasd-controls="enabled: false">
-
-      <!-- Desktop cursor ONLY -->
+      
+      <!-- Desktop cursor -->
       <a-entity
         cursor="rayOrigin: mouse"
         raycaster="objects: .clickable"
@@ -150,21 +147,35 @@
         material="color: #4CC3D9; shader: flat"
         position="0 0 -1">
       </a-entity>
-
+      
     </a-entity>
   </a-entity>
 
-  <!-- VR CONTROLLERS (CORRECT + SIMPLE) -->
-  <a-entity
-    laser-controls="hand: right"
+  <!-- VR CONTROLLERS WITH THUMBSTICK SUPPORT -->
+  <a-entity 
+    id="rightController" 
+    laser-controls="hand: right; model: false"
     raycaster="objects: .clickable; far: 100"
-    line="opacity: 0.6">
+    line="color: #4CC3D9; opacity: 0.6">
+    
+    <!-- Controller model for VR -->
+    <a-entity oculus-touch-controls="hand: right"></a-entity>
+    <a-entity vive-controls="hand: right"></a-entity>
+    <a-entity windows-motion-controls="hand: right"></a-entity>
+    
   </a-entity>
 
-  <a-entity
-    laser-controls="hand: left"
+  <a-entity 
+    id="leftController" 
+    laser-controls="hand: left; model: false"
     raycaster="objects: .clickable; far: 100"
-    line="opacity: 0.3">
+    line="color: #4CC3D9; opacity: 0.3">
+    
+    <!-- Controller model for VR -->
+    <a-entity oculus-touch-controls="hand: left"></a-entity>
+    <a-entity vive-controls="hand: left"></a-entity>
+    <a-entity windows-motion-controls="hand: left"></a-entity>
+    
   </a-entity>
 
   <!-- HOTSPOTS -->
@@ -178,6 +189,8 @@ const sky = document.getElementById("sky");
 const camera = document.getElementById("camera");
 const hotspotsContainer = document.getElementById("hotspots");
 const loadingOverlay = document.getElementById("loadingOverlay");
+const rightController = document.getElementById("rightController");
+const leftController = document.getElementById("leftController");
 
 let isLoading = false;
 let currentNodeId = "point1";
@@ -587,6 +600,34 @@ const nodes = {
 };
 
 /* ===========================
+   THUMBSTICK LOOK CONTROLS
+=========================== */
+function setupThumbstickControls() {
+  // Listen for thumbstick events on controllers
+  [leftController, rightController].forEach(controller => {
+    if (!controller) return;
+    
+    // Listen for thumbstick moves
+    controller.addEventListener('thumbstickmoved', (event) => {
+      const { x, y } = event.detail;
+      
+      // If thumbstick is moved significantly, rotate camera
+      if (Math.abs(x) > 0.1 || Math.abs(y) > 0.1) {
+        const rotation = camera.getAttribute('rotation');
+        const newYaw = rotation.y + (x * 2); // Adjust sensitivity
+        const newPitch = Math.max(-90, Math.min(90, rotation.x - (y * 1.5)));
+        
+        camera.setAttribute('rotation', {
+          x: newPitch,
+          y: newYaw,
+          z: rotation.z
+        });
+      }
+    });
+  });
+}
+
+/* ===========================
    LOAD NODE
 =========================== */
 async function loadNode(nodeId) {
@@ -657,6 +698,9 @@ function buildHotspots(node) {
    INIT
 =========================== */
 scene.addEventListener("loaded", () => {
+  // Setup thumbstick controls
+  setupThumbstickControls();
+  
   // Check for URL parameter
   const urlParams = new URLSearchParams(window.location.search);
   const imageKey = urlParams.get('image');
@@ -680,6 +724,7 @@ scene.addEventListener("loaded", () => {
 =========================== */
 scene.addEventListener("enter-vr", () => {
   document.body.classList.add("vr-mode");
+  console.log("VR mode entered - thumbsticks should work");
 });
 
 scene.addEventListener("exit-vr", () => {
@@ -701,6 +746,13 @@ window.loadByImageKey = function(imageKey) {
   return false;
 };
 window.getPanoramaNodes = () => nodes;
+
+// Also allow exit with Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    exitVRTour();
+  }
+});
 </script>
 </body>
 </html>
