@@ -1,18 +1,14 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="utf-8" />
   <title>360 Street View Tour</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-
-  <!-- Joystick look controls -->
-  <script src="https://cdn.jsdelivr.net/npm/aframe-joystick-look-controls@1.1.0/dist/aframe-joystick-look-controls.min.js"></script>
-
   <style>
-    html, body {
+    html,
+    body {
       margin: 0;
       padding: 0;
       width: 100%;
@@ -21,178 +17,1092 @@
       background: #000;
     }
 
+    a-scene {
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* Loading overlay */
     #loadingOverlay {
       position: fixed;
-      inset: 0;
-      background: black;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
       display: flex;
       flex-direction: column;
-      align-items: center;
       justify-content: center;
-      z-index: 9999;
+      align-items: center;
+      z-index: 10000;
       color: white;
-      font-family: Arial;
+      font-family: Arial, sans-serif;
+      transition: opacity 0.5s ease;
+    }
+
+    #loadingOverlay.fade-out {
+      opacity: 0;
+      pointer-events: none;
     }
 
     .spinner {
       width: 50px;
       height: 50px;
-      border: 5px solid rgba(255,255,255,.3);
-      border-top-color: #4CC3D9;
+      border: 5px solid rgba(255, 255, 255, 0.3);
       border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 15px;
+      border-top-color: #4CC3D9;
+      animation: spin 1s ease-in-out infinite;
+      margin-bottom: 20px;
     }
 
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    /* Exit VR Button Styles */
+    #exitVRBtn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      background: linear-gradient(135deg, #ff4757 0%, #ff3838 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-family: Arial, sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(255, 71, 87, 0.4);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    #exitVRBtn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(255, 71, 87, 0.6);
+      background: linear-gradient(135deg, #ff5e6d 0%, #ff4d4d 100%);
+    }
+
+    #exitVRBtn:active {
+      transform: translateY(0);
+    }
+
+    #exitVRBtn i {
+      font-size: 18px;
+    }
+
+    /* Hide button in VR mode */
+    .vr-mode #exitVRBtn {
+      display: none;
+    }
+    
+    /* Controller tooltip */
+    .controller-tooltip {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 15px 25px;
+      border-radius: 10px;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      z-index: 9998;
+      text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      display: none;
+    }
+    
+    .vr-mode .controller-tooltip {
+      display: block;
+    }
   </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 
 <body>
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay">
+    <div class="spinner"></div>
+    <div>Loading Panorama...</div>
+  </div>
 
-<div id="loadingOverlay">
-  <div class="spinner"></div>
-  Loading panorama...
-</div>
+  <!-- Exit VR Button -->
+  <button id="exitVRBtn">
+    <i class="fas fa-sign-out-alt"></i> Exit VR Tour
+  </button>
+  
+  <!-- Controller Tooltip -->
+  <div class="controller-tooltip" id="controllerTooltip">
+    <i class="fas fa-gamepad"></i> Use controller trigger to select hotspots
+  </div>
 
-<a-scene
-  webxr="referenceSpaceType: local-floor"
-  vr-mode-ui="enabled: true"
-  raycaster="objects: .clickable">
+  <a-scene 
+    webxr="referenceSpaceType: local-floor" 
+    vr-mode-ui="enabled: true" 
+    cursor="rayOrigin: mouse" 
+    raycaster="objects: .clickable; far: 50"
+    renderer="antialias: true; alpha: false">
 
-  <!-- Assets -->
-  <a-assets>
-    <img id="pano1" src="Assets/img1.avif">
-    <img id="pano2" src="Assets/img2.avif">
-    <img id="navArrow" src="Assets/red-pin.avif">
-  </a-assets>
+    <!-- All images lazy loaded -->
+    <a-assets timeout="30000">
+      <!-- All images with preload="none" for lazy loading -->
+      <img id="pano1" src="Assets/img1.avif" crossorigin="anonymous" preload="none">
+      <img id="pano2" src="Assets/img2.avif" crossorigin="anonymous" preload="none">
+      <img id="pano3" src="Assets/img3.avif" crossorigin="anonymous" preload="none">
+      <img id="pano4" src="Assets/img4.avif" crossorigin="anonymous" preload="none">
+      <img id="pano5" src="Assets/img5.avif" crossorigin="anonymous" preload="none">
+      <img id="pano6" src="Assets/img6.avif" crossorigin="anonymous" preload="none">
+      <img id="pano7" src="Assets/img7.avif" crossorigin="anonymous" preload="none">
+      <img id="pano8" src="Assets/img8.avif" crossorigin="anonymous" preload="none">
+      <img id="pano9" src="Assets/img9.avif" crossorigin="anonymous" preload="none">
+      <img id="pano10" src="Assets/img10.avif" crossorigin="anonymous" preload="none">
+      <img id="pano11" src="Assets/img11.avif" crossorigin="anonymous" preload="none">
+      <img id="pano12" src="Assets/img12.avif" crossorigin="anonymous" preload="none">
+      <img id="pano13" src="Assets/img13.avif" crossorigin="anonymous" preload="none">
+      <img id="pano14" src="Assets/img14.avif" crossorigin="anonymous" preload="none">
+      <img id="pano15" src="Assets/img15.avif" crossorigin="anonymous" preload="none">
+      <img id="pano16" src="Assets/img16.avif" crossorigin="anonymous" preload="none">
+      <img id="pano17" src="Assets/img17.avif" crossorigin="anonymous" preload="none">
+      <img id="pano18" src="Assets/img18.avif" crossorigin="anonymous" preload="none">
+      <img id="pano19" src="Assets/img19.avif" crossorigin="anonymous" preload="none">
+      <img id="pano20" src="Assets/img20.avif" crossorigin="anonymous" preload="none">
+      <img id="pano21" src="Assets/img21.avif" crossorigin="anonymous" preload="none">
+      <img id="pano22" src="Assets/img22.avif" crossorigin="anonymous" preload="none">
+      <img id="pano23" src="Assets/img23.avif" crossorigin="anonymous" preload="none">
+      <img id="pano24" src="Assets/img24.avif" crossorigin="anonymous" preload="none">
+      <img id="pano25" src="Assets/img25.avif" crossorigin="anonymous" preload="none">
+      <img id="pano26" src="Assets/img26.avif" crossorigin="anonymous" preload="none">
+      <img id="pano27" src="Assets/img27.avif" crossorigin="anonymous" preload="none">
+      <img id="pano28" src="Assets/img28.avif" crossorigin="anonymous" preload="none">
+      <img id="pano29" src="Assets/img29.avif" crossorigin="anonymous" preload="none">
+      <img id="pano30" src="Assets/img30.avif" crossorigin="anonymous" preload="none">
+      <img id="pano31" src="Assets/img31.avif" crossorigin="anonymous" preload="none">
+      <img id="pano32" src="Assets/img32.avif" crossorigin="anonymous" preload="none">
+      <img id="pano33" src="Assets/img33.avif" crossorigin="anonymous" preload="none">
+      <img id="pano34" src="Assets/img34.avif" crossorigin="anonymous" preload="none">
+      <img id="pano35" src="Assets/img35.avif" crossorigin="anonymous" preload="none">
+      <img id="pano36" src="Assets/img36.avif" crossorigin="anonymous" preload="none">
+      <img id="pano37" src="Assets/img37.avif" crossorigin="anonymous" preload="none">
+      <img id="pano38" src="Assets/img38.avif" crossorigin="anonymous" preload="none">
+      <img id="pano39" src="Assets/img39.avif" crossorigin="anonymous" preload="none">
+      <img id="pano40" src="Assets/img40.avif" crossorigin="anonymous" preload="none">
+      <img id="pano41" src="Assets/img41.avif" crossorigin="anonymous" preload="none">
+      <img id="pano42" src="Assets/img42.avif" crossorigin="anonymous" preload="none">
+      <img id="pano43" src="Assets/img43.avif" crossorigin="anonymous" preload="none">
 
-  <!-- SKY -->
-  <a-sky id="sky" src="#pano1" rotation="0 90 0"></a-sky>
+      <!-- Navigation Arrow -->
+      <img id="navArrow" src="Assets/red-pin.avif" crossorigin="anonymous" preload="auto">
+    </a-assets>
 
-  <!-- CAMERA RIG -->
-  <a-entity id="rig">
-    <a-entity
-      id="camera"
-      camera
-      look-controls="pointerLockEnabled: false"
-      joystick-look-controls="enabled: true; turnSpeed: 2"
-      wasd-controls="enabled: false">
+    <!-- SKY -->
+    <a-sky id="sky" src="#pano1" rotation="0 90 0" material="shader: flat;"></a-sky>
 
-      <!-- Desktop mouse cursor ONLY -->
-      <a-entity
-        cursor="rayOrigin: mouse"
-        raycaster="objects: .clickable"
-        geometry="primitive: ring; radiusInner: 0.015; radiusOuter: 0.025"
-        material="color: #4CC3D9; shader: flat"
-        position="0 0 -1">
+    <!-- Camera rig -->
+    <a-entity id="rig" position="0 0 0">
+      <!-- camera needs an id so script can rotate it -->
+      <a-entity id="camera" 
+                camera 
+                look-controls="pointerLockEnabled: true"
+                mouse-cursor>
+        
+        <!-- Combined cursor for both desktop and VR -->
+        <a-entity cursor
+                  raycaster="objects: .clickable; far: 50"
+                  geometry="primitive: ring; radiusInner: 0.008; radiusOuter: 0.016"
+                  material="color: #4CC3D9; shader: flat"
+                  position="0 0 -1"
+                  animation__click="property: scale; startEvents: click; from: 0.1 0.1 0.1; to: 1 1 1; dur: 150"
+                  animation__fusing="property: scale; startEvents: fusing; from: 1 1 1; to: 0.1 0.1 0.1; dur: 1500"
+                  animation__mouseleave="property: scale; startEvents: mouseleave; from: 0.1 0.1 0.1; to: 1 1 1; dur: 500">
+        </a-entity>
+        
       </a-entity>
-
     </a-entity>
-  </a-entity>
+    
+    <!-- VR Controllers -->
+    <a-entity id="leftHand" 
+              laser-controls="hand: left" 
+              raycaster="objects: .clickable; far: 50"
+              line="color: #4CC3D9; opacity: 0.5">
+      <!-- Controller model -->
+      <a-entity vive-controls="hand: left"
+                oculus-touch-controls="hand: left"
+                windows-motion-controls="hand: left"
+                daydream-controls="hand: left"
+                generic-tracked-controller-controls="hand: left">
+      </a-entity>
+    </a-entity>
+    
+    <a-entity id="rightHand" 
+              laser-controls="hand: right" 
+              raycaster="objects: .clickable; far: 50"
+              line="color: #4CC3D9; opacity: 0.5">
+      <!-- Controller model -->
+      <a-entity vive-controls="hand: right"
+                oculus-touch-controls="hand: right"
+                windows-motion-controls="hand: right"
+                daydream-controls="hand: right"
+                generic-tracked-controller-controls="hand: right">
+      </a-entity>
+    </a-entity>
 
-  <!-- VR CONTROLLERS (CORRECT WAY) -->
-  <a-entity
-    laser-controls="hand: right"
-    raycaster="objects: .clickable; far: 100"
-    line="opacity: 0.6">
-  </a-entity>
+    <!-- Hotspot container -->
+    <a-entity id="hotspots"></a-entity>
+    
+    <!-- Sound effects -->
+    <a-asset-item id="clickSound" src="https://cdn.aframe.io/360-image-gallery-boilerplate/audio/click.ogg"></a-asset-item>
+    
+  </a-scene>
 
-  <a-entity
-    laser-controls="hand: left"
-    raycaster="objects: .clickable; far: 100"
-    line="opacity: 0.3">
-  </a-entity>
+  <script>
+    const scene = document.querySelector("a-scene");
+    const sky = document.querySelector("#sky");
+    const camera = document.querySelector("#camera");
+    const hotspotsContainer = document.querySelector("#hotspots");
+    const rig = document.querySelector("#rig");
+    const exitVRBtn = document.getElementById("exitVRBtn");
+    const loadingOverlay = document.getElementById("loadingOverlay");
+    const controllerTooltip = document.getElementById("controllerTooltip");
+    
+    let isLoading = false;
+    let isInVR = false;
+    let leftController = null;
+    let rightController = null;
+    let cursor = null;
+    let raycasterSystem = null;
 
-  <!-- HOTSPOTS -->
-  <a-entity id="hotspots"></a-entity>
+    // Track loaded images to prevent duplicate loading
+    const loadedImages = new Set();
 
-</a-scene>
+    // Exit VR function
+    function exitVRTour() {
+      console.log("Exiting VR Tour and returning to index.html...");
+      window.location.href = "index.html";
+    }
 
-<script>
-const sky = document.getElementById("sky");
-const hotspotsContainer = document.getElementById("hotspots");
-const loadingOverlay = document.getElementById("loadingOverlay");
+    // Attach exit function to button
+    exitVRBtn.addEventListener("click", exitVRTour);
 
-let isLoading = false;
-let currentNode = "point1";
-
-/* ===============================
-   NODES CONFIG (SAMPLE)
-================================ */
-const nodes = {
-  point1: {
-    sky: "#pano1",
-    yaw: 90,
-    hotspots: [
-      { pos: "0 -1 -5", rot: "0 180 0", target: "point2" }
-    ]
-  },
-  point2: {
-    sky: "#pano2",
-    yaw: -90,
-    hotspots: [
-      { pos: "0 -1 5", rot: "0 0 0", target: "point1" }
-    ]
-  }
-};
-
-/* ===============================
-   LOAD NODE
-================================ */
-function loadNode(id) {
-  if (isLoading) return;
-  isLoading = true;
-
-  const node = nodes[id];
-  if (!node) return;
-
-  loadingOverlay.style.display = "flex";
-
-  sky.setAttribute("src", node.sky);
-  sky.setAttribute("rotation", `0 ${-node.yaw} 0`);
-
-  buildHotspots(id);
-
-  setTimeout(() => {
-    loadingOverlay.style.display = "none";
-    isLoading = false;
-    currentNode = id;
-  }, 300);
-}
-
-/* ===============================
-   BUILD HOTSPOTS
-================================ */
-function buildHotspots(id) {
-  hotspotsContainer.innerHTML = "";
-  const node = nodes[id];
-
-  node.hotspots.forEach(h => {
-    const el = document.createElement("a-image");
-    el.setAttribute("src", "#navArrow");
-    el.setAttribute("position", h.pos);
-    el.setAttribute("rotation", h.rot);
-    el.setAttribute("scale", "1.5 1.5 1.5");
-    el.setAttribute("class", "clickable");
-
-    el.addEventListener("click", () => {
-      if (!isLoading) loadNode(h.target);
+    // Also allow exiting with Escape key
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        exitVRTour();
+      }
     });
 
-    hotspotsContainer.appendChild(el);
-  });
-}
+    // Detect VR mode to hide/show button appropriately
+    scene.addEventListener("enter-vr", () => {
+      console.log("VR mode entered");
+      document.body.classList.add("vr-mode");
+      isInVR = true;
+      setupVRControllers();
+    });
+    
+    scene.addEventListener("exit-vr", () => {
+      console.log("VR mode exited");
+      document.body.classList.remove("vr-mode");
+      isInVR = false;
+    });
 
-/* ===============================
-   INIT
-================================ */
-document.querySelector("a-scene").addEventListener("loaded", () => {
-  loadNode("point1");
-});
-</script>
+    // Scene loaded handler
+    scene.addEventListener("loaded", () => {
+      console.log("Scene loaded");
+      
+      // Get references to important elements
+      cursor = camera.querySelector('[cursor]');
+      raycasterSystem = scene.systems.raycaster;
+      
+      // Get controller references
+      leftController = document.getElementById('leftHand');
+      rightController = document.getElementById('rightHand');
+      
+      // Setup cursor and raycaster
+      setupCursor();
+      
+      // Setup controller event listeners
+      setupControllerEvents();
+      
+      // Check if we should load a specific image from URL parameter
+      const urlParams = new URLSearchParams(window.location.search);
+      const imageKey = urlParams.get('image');
+      
+      if (imageKey) {
+        console.log("Loading specific panorama from URL:", imageKey);
+        // Load the specific image from URL parameter
+        loadByImageKey(imageKey);
+      } else {
+        // Otherwise start with first image
+        console.log("Starting with default panorama");
+        loadNode("point1");
+      }
+    });
 
+    function setupCursor() {
+      if (!cursor) return;
+      
+      // Configure cursor for proper interaction
+      cursor.setAttribute('cursor', {
+        rayOrigin: 'mouse',
+        fuse: true,
+        fuseTimeout: 500
+      });
+      
+      // Configure raycaster to properly detect hotspots
+      cursor.setAttribute('raycaster', {
+        objects: '.clickable',
+        far: 50,
+        interval: 100,
+        showLine: false
+      });
+      
+      // Add event listener for click
+      cursor.addEventListener('click', (evt) => {
+        if (isLoading || isInVR) return;
+        
+        const intersectedEl = evt.detail.intersectedEl;
+        if (intersectedEl && intersectedEl.classList.contains('clickable')) {
+          console.log("Clicked hotspot:", intersectedEl);
+          
+          // Get the target from the hotspot's data attribute
+          const target = intersectedEl.getAttribute('data-target');
+          if (target) {
+            loadNode(target);
+          }
+        }
+      });
+      
+      // Add hover effects
+      cursor.addEventListener('raycaster-intersection', (evt) => {
+        if (isLoading || isInVR) return;
+        
+        const intersectedEl = evt.detail.intersections[0]?.object.el;
+        if (intersectedEl && intersectedEl.classList.contains('clickable')) {
+          // Highlight on hover
+          intersectedEl.setAttribute('animation', {
+            property: 'scale',
+            to: intersectedEl.getAttribute('data-original-scale'),
+            dur: 200,
+            easing: 'easeOutQuad'
+          });
+        }
+      });
+      
+      cursor.addEventListener('raycaster-intersection-cleared', (evt) => {
+        if (isLoading || isInVR) return;
+        
+        const clearedEl = evt.detail.el;
+        if (clearedEl && clearedEl.classList.contains('clickable')) {
+          // Return to original scale
+          const originalScale = clearedEl.getAttribute('data-original-scale');
+          clearedEl.setAttribute('scale', originalScale);
+        }
+      });
+    }
+
+    function setupVRControllers() {
+      console.log("Setting up VR controllers...");
+      
+      // Ensure controllers are properly configured for raycasting
+      if (leftController) {
+        leftController.setAttribute('raycaster', {
+          objects: '.clickable',
+          far: 50,
+          showLine: true
+        });
+      }
+      
+      if (rightController) {
+        rightController.setAttribute('raycaster', {
+          objects: '.clickable',
+          far: 50,
+          showLine: true
+        });
+      }
+    }
+
+    function setupControllerEvents() {
+      // Listen for trigger events on controllers
+      const controllers = [leftController, rightController];
+      
+      controllers.forEach((controller, index) => {
+        if (!controller) return;
+        
+        // Listen for triggerdown event (when trigger is pressed)
+        controller.addEventListener('triggerdown', (evt) => {
+          if (isLoading) return;
+          
+          // Get the intersected element
+          const intersections = evt.detail.intersections;
+          if (intersections && intersections.length > 0) {
+            const intersectedEl = intersections[0].object.el;
+            
+            // Check if it's a hotspot
+            if (intersectedEl.classList.contains('clickable')) {
+              console.log(`Controller ${index} clicked hotspot`);
+              
+              // Get the target from the hotspot's data attribute
+              const target = intersectedEl.getAttribute('data-target');
+              if (target) {
+                loadNode(target);
+              }
+            }
+          }
+        });
+        
+        // Add visual feedback on trigger press
+        controller.addEventListener('triggerdown', () => {
+          const line = controller.querySelector('[line]');
+          if (line) {
+            line.setAttribute('opacity', 0.8);
+            line.setAttribute('color', '#FF3366');
+          }
+        });
+        
+        controller.addEventListener('triggerup', () => {
+          const line = controller.querySelector('[line]');
+          if (line) {
+            line.setAttribute('opacity', 0.5);
+            line.setAttribute('color', '#4CC3D9');
+          }
+        });
+        
+        // Add hover effects for controllers
+        controller.addEventListener('raycaster-intersection', (evt) => {
+          const intersectedEl = evt.detail.intersections[0]?.object.el;
+          if (intersectedEl && intersectedEl.classList.contains('clickable')) {
+            // Visual feedback for hover
+            intersectedEl.setAttribute('animation', {
+              property: 'scale',
+              to: intersectedEl.getAttribute('data-hover-scale'),
+              dur: 200,
+              easing: 'easeOutQuad'
+            });
+          }
+        });
+        
+        controller.addEventListener('raycaster-intersection-cleared', (evt) => {
+          const clearedEl = evt.detail.el;
+          if (clearedEl && clearedEl.classList.contains('clickable')) {
+            // Return to original scale
+            const originalScale = clearedEl.getAttribute('data-original-scale');
+            clearedEl.setAttribute('scale', originalScale);
+          }
+        });
+      });
+    }
+
+    function hideLoadingOverlay() {
+      if (loadingOverlay) {
+        loadingOverlay.classList.add('fade-out');
+        setTimeout(() => {
+          loadingOverlay.style.display = 'none';
+        }, 500);
+      }
+    }
+
+    // current node id tracker
+    let currentNodeId = "point1";
+    let extraYaw = 0;
+
+    // All config in one object: pano + base yaw + hotspots + imageKey
+    const nodes = {
+      point1: {
+        skyId: "#pano1",
+        yaw: 90,
+        imageKey: "1",
+        hotspots: [
+          { id: "hs1", position: "-10 -1 -2", rotation: "0 -90 0", scale: "1.5 1.5 1.5", target: "point2" },
+          { id: "hs2", position: "20 -1 0", rotation: "0 90 0", scale: "1.5 1.5 1.5", target: "point3" },
+          { id: "hs3", position: "20 -1 -20", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point4" }
+        ]
+      },
+      point2: {
+        skyId: "#pano2",
+        yaw: 85,
+        imageKey: "2",
+        hotspots: [
+          { id: "hs4", position: "0 -0.5 -5", rotation: "0 180 0", scale: "1 1 1", target: "point1" }
+        ]
+      },
+      point3: {
+        skyId: "#pano3",
+        yaw: -25,
+        imageKey: "3",
+        hotspots: [
+          { id: "hs5", position: "-10 -1 -25", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point1" }
+        ]
+      },
+      point4: {
+        skyId: "#pano4",
+        yaw: -90,
+        imageKey: "4",
+        hotspots: [
+          { id: "hs6", position: "-3 -1 6", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point1" },
+          { id: "hs7", position: "-2 -0.9 -30", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point5" }
+        ]
+      },
+      point5: {
+        skyId: "#pano5",
+        yaw: -90,
+        imageKey: "5",
+        hotspots: [
+          { id: "hs8", position: "-2 -1 13", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point4" },
+          { id: "hs9", position: "2 -0.9 -20", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point6" }
+        ]
+      },
+      point6: {
+        skyId: "#pano6",
+        yaw: -90,
+        imageKey: "6",
+        hotspots: [
+          { id: "hs10", position: "0.8 -0.9 15", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point5" },
+          { id: "hs11", position: "-1 -1 -25", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point7" }
+        ]
+      },
+      point7: {
+        skyId: "#pano7",
+        yaw: 90,
+        imageKey: "7",
+        hotspots: [
+          { id: "hs12", position: "0 -1 30", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point6" },
+          { id: "hs13", position: "0 -1 -20", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point8" }
+        ]
+      },
+      point8: {
+        skyId: "#pano8",
+        yaw: -90,
+        imageKey: "8",
+        hotspots: [
+          { id: "hs14", position: "-2 -1 20", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point7" },
+          { id: "hs15", position: "-15 -1 -30", rotation: "0 0 0", scale: "2 2 2", target: "point9" }
+        ]
+      },
+      point9: {
+        skyId: "#pano9",
+        yaw: -205,
+        imageKey: "9",
+        hotspots: [
+          { id: "hs16", position: "5 -1 20", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point8" },
+          { id: "hs17", position: "0 -2 -20", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point10" },
+          { id: "hs46", position: "150 -2 -10", rotation: "0 90 0", scale: "8 8 8", target: "point21" }
+        ]
+      },
+      point10: {
+        skyId: "#pano10",
+        yaw: -80,
+        imageKey: "10",
+        hotspots: [
+          { id: "hs18", position: "13 -1 1", rotation: "0 90 0", scale: "1.5 1.5 1.5", target: "point9" },
+          { id: "hs19", position: "1 -1 -20", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point11" }
+        ]
+      },
+      point11: {
+        skyId: "#pano11",
+        yaw: 90,
+        imageKey: "11",
+        hotspots: [
+          { id: "hs20", position: "2 -1 12", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point10" },
+          { id: "hs21", position: "-2.8 -2 -15", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point12" }
+        ]
+      },
+      point12: {
+        skyId: "#pano12",
+        yaw: -90,
+        imageKey: "12",
+        hotspots: [
+          { id: "hs22", position: "3.2 -5 15", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point11" },
+          { id: "hs23", position: "-18 -2 -15", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point13" }
+        ]
+      },
+      point13: {
+        skyId: "#pano13",
+        yaw: 90,
+        imageKey: "13",
+        hotspots: [
+          { id: "hs24", position: "10 -1 12", rotation: "0 45 0", scale: "1.5 1.5 1.5", target: "point12" },
+          { id: "hs25", position: "10 -4 -18", rotation: "0 0 0", scale: "2 2 2", target: "point14" }
+        ]
+      },
+      point14: {
+        skyId: "#pano14",
+        yaw: -80,
+        imageKey: "14",
+        hotspots: [
+          { id: "hs26", position: "0 -4 15", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point13" },
+          { id: "hs27", position: "0 -4 -25", rotation: "0 0 0", scale: "2 2 2", target: "point15" }
+        ]
+      },
+      point15: {
+        skyId: "#pano15",
+        yaw: 180,
+        imageKey: "15",
+        hotspots: [
+          { id: "hs28", position: "0 -1 13", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point14" },
+          { id: "hs29", position: "2 -4 -20", rotation: "0 0 0", scale: "2 2 2", target: "point16" }
+        ]
+      },
+      point16: {
+        skyId: "#pano16",
+        yaw: 180,
+        imageKey: "16",
+        hotspots: [
+          { id: "hs30", position: "2 -1 20", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point15" },
+          { id: "hs31", position: "-6 -4 -15", rotation: "0 0 0", scale: "2 2 2", target: "point17" },
+          { id: "hs32", position: "-3.2 -4 -20", rotation: "0 0 0", scale: "2 2 2", target: "point18" }
+        ]
+      },
+      point17: {
+        skyId: "#pano17",
+        yaw: -145,
+        imageKey: "17",
+        hotspots: [
+          { id: "hs33", position: "8 -3 -1.8", rotation: "0 90 0", scale: "1.5 1.5 1.5", target: "point16" },
+          { id: "hs34", position: "-4 -4 -15", rotation: "0 0 0", scale: "2 2 2", target: "point18" }
+        ]
+      },
+      point18: {
+        skyId: "#pano18",
+        yaw: 0,
+        imageKey: "18",
+        hotspots: [
+          { id: "hs35", position: "10 -4 5", rotation: "0 90 0", scale: "1.5 1.5 1.5", target: "point17" },
+          { id: "hs36", position: "8 -4 -12", rotation: "0 135 0", scale: "1.5 1.5 1.5", target: "point19" },
+          { id: "hs37", position: "-10 -4 -1.5", rotation: "0 90 0", scale: "1.5 1.5 1.5", target: "point20" },
+        ]
+      },
+      point19: {
+        skyId: "#pano19",
+        yaw: -90,
+        imageKey: "19",
+        hotspots: [
+          { id: "hs38", position: "9 -6 -19", rotation: "0 135 0", scale: "2 2 2", target: "point18" },
+        ]
+      },
+      point20: {
+        skyId: "#pano20",
+        yaw: 0,
+        imageKey: "20",
+        hotspots: [
+          { id: "hs38", position: "30 -6 2", rotation: "0 90 0", scale: "3 3 3", target: "point18" },
+          { id: "hs39", position: "25 -6 -105", rotation: "0 0 0", scale: "6 6 6", target: "point21" },
+          { id: "hs40", position: "-20 -6 -30", rotation: "0 0 0", scale: "6 6 6", target: "point22" },
+        ]
+      },
+      point21: {
+        skyId: "#pano21",
+        yaw: 90,
+        imageKey: "21",
+        hotspots: [
+          { id: "hs41", position: "35 -6 -165", rotation: "0 180 0", scale: "10 10 10", target: "point20" },
+          { id: "hs42", position: "-145 -6 1", rotation: "0 90 0", scale: "7 7 7", target: "point9" },
+        ]
+      },
+      point22: {
+        skyId: "#pano22",
+        yaw: -90,
+        imageKey: "22",
+        hotspots: [
+          { id: "hs43", position: "0 -6 -15", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point23" },
+          { id: "hs44", position: "-30 -6 30", rotation: "0 0 0", scale: "3 3 3", target: "point20" },
+          { id: "hs45", position: "35 -6 20", rotation: "0 45 0", scale: "3 3 3", target: "point21" }
+        ]
+      },
+      point23: {
+        skyId: "#pano23",
+        yaw: -90,
+        imageKey: "23",
+        hotspots: [
+          { id: "hs47", position: "1 -6 40", rotation: "0 180 0", scale: "4 4 4", target: "point22" },
+          { id: "hs48", position: "3 -6 -60", rotation: "0 180 0", scale: "6 6 6", target: "point24" }
+        ]
+      },
+      point24: {
+        skyId: "#pano24",
+        yaw: -120,
+        imageKey: "24",
+        hotspots: [
+          { id: "hs49", position: "1 -6 40", rotation: "0 180 0", scale: "4 4 4", target: "point23" },
+          { id: "hs50", position: "3 -6 -60", rotation: "0 180 0", scale: "6 6 6", target: "point25" }
+        ]
+      },
+      point25: {
+        skyId: "#pano25",
+        yaw: 90,
+        imageKey: "25",
+        hotspots: [
+          { id: "hs51", position: "1 -6 40", rotation: "0 180 0", scale: "4 4 4", target: "point24" },
+          { id: "hs52", position: "3 -6 -60", rotation: "0 180 0", scale: "6 6 6", target: "point26" }
+        ]
+      },
+      point26: {
+        skyId: "#pano26",
+        yaw: -90,
+        imageKey: "26",
+        hotspots: [
+          { id: "hs53", position: "-45 -6 -2", rotation: "0 90 0", scale: "4 4 4", target: "point25" },
+          { id: "hs54", position: "3 -6 -60", rotation: "0 180 0", scale: "6 6 6", target: "point27" },
+          { id: "hs55", position: "35 -6 8", rotation: "0 90 0", scale: "6 6 6", target: "point43" }
+        ]
+      },
+      point27: {
+        skyId: "#pano27",
+        yaw: 0,
+        imageKey: "27",
+        hotspots: [
+          { id: "hs56", position: "1 -6 25", rotation: "0 180 0", scale: "4 4 4", target: "point26" },
+          { id: "hs57", position: "-3 -6 -60", rotation: "0 180 0", scale: "6 6 6", target: "point28" }
+        ]
+      },
+      point28: {
+        skyId: "#pano28",
+        yaw: -20,
+        imageKey: "28",
+        hotspots: [
+          { id: "hs58", position: "-2 -6 25", rotation: "0 180 0", scale: "4 4 4", target: "point27" },
+          { id: "hs59", position: "-3 -6 -35", rotation: "0 180 0", scale: "6 6 6", target: "point31" },
+          { id: "hs60", position: "-25 -10 -3", rotation: "0 90 0", scale: "6 6 6", target: "point29" }
+        ]
+      },
+      point29: {
+        skyId: "#pano29",
+        yaw: 122,
+        imageKey: "29",
+        hotspots: [
+          { id: "hs60", position: "4.5 -10 25", rotation: "0 180 0", scale: "4 4 4", target: "point28" },
+          { id: "hs61", position: "-3 -6 -35", rotation: "0 180 0", scale: "6 6 6", target: "point30" }
+        ]
+      },
+      point30: {
+        skyId: "#pano30",
+        yaw: 47,
+        imageKey: "30",
+        hotspots: [
+          { id: "hs62", position: "4.5 -10 25", rotation: "0 180 0", scale: "4 4 4", target: "point29" }
+        ]
+      },
+      point31: {
+        skyId: "#pano31",
+        yaw: -95,
+        imageKey: "31",
+        hotspots: [
+          { id: "hs63", position: "0 -10 35", rotation: "0 180 0", scale: "6 6 6", target: "point29" },
+          { id: "hs64", position: "30 -6 -4", rotation: "0 90 0", scale: "3 3 3", target: "point32" }
+        ]
+      },
+      point32: {
+        skyId: "#pano32",
+        yaw: 0,
+        imageKey: "32",
+        hotspots: [
+          { id: "hs65", position: "0 -10 35", rotation: "0 180 0", scale: "6 6 6", target: "point31" },
+          { id: "hs66", position: "0 -6 -40", rotation: "0 180 0", scale: "6 6 6", target: "point33" }
+        ]
+      },
+      point33: {
+        skyId: "#pano33",
+        yaw: 180,
+        imageKey: "33",
+        hotspots: [
+          { id: "hs67", position: "0 -10 100", rotation: "0 180 0", scale: "10 10 10", target: "point32" },
+          { id: "hs68", position: "0 -6 -40", rotation: "0 180 0", scale: "6 6 6", target: "point34" }
+        ]
+      },
+      point34: {
+        skyId: "#pano34",
+        yaw: 180,
+        imageKey: "34",
+        hotspots: [
+          { id: "hs69", position: "0 -10 100", rotation: "0 180 0", scale: "10 10 10", target: "point33" },
+          { id: "hs70", position: "0 -6 -40", rotation: "0 180 0", scale: "6 6 6", target: "point35" }
+        ]
+      },
+      point35: {
+        skyId: "#pano35",
+        yaw: 180,
+        imageKey: "35",
+        hotspots: [
+          { id: "hs71", position: "0 -10 100", rotation: "0 180 0", scale: "6 6 6", target: "point34" },
+          { id: "hs72", position: "0 -6 -40", rotation: "0 180 0", scale: "4 4 4", target: "point36" }
+        ]
+      },
+      point36: {
+        skyId: "#pano36",
+        yaw: 170,
+        imageKey: "36",
+        hotspots: [
+          { id: "hs73", position: "0 -10 100", rotation: "0 180 0", scale: "6 6 6", target: "point35" },
+          { id: "hs74", position: "0 -6 -40", rotation: "0 180 0", scale: "4 4 4", target: "point37" }
+        ]
+      },
+      point37: {
+        skyId: "#pano37",
+        yaw: 185,
+        imageKey: "37",
+        hotspots: [
+          { id: "hs75", position: "0 -10 100", rotation: "0 180 0", scale: "6 6 6", target: "point36" },
+          { id: "hs76", position: "0 -6 -40", rotation: "0 180 0", scale: "4 4 4", target: "point38" }
+        ]
+      },
+      point38: {
+        skyId: "#pano38",
+        yaw: -96,
+        imageKey: "38",
+        hotspots: [
+          { id: "hs77", position: "50 -10 1", rotation: "0 90 0", scale: "6 6 6", target: "point37" },
+          { id: "hs78", position: "0 -6 -40", rotation: "0 180 0", scale: "4 4 4", target: "point39" }
+        ]
+      },
+      point39: {
+        skyId: "#pano39",
+        yaw: -5,
+        imageKey: "39",
+        hotspots: [
+          { id: "hs77", position: "3 -10 60", rotation: "0 180 0", scale: "6 6 6", target: "point38" },
+          { id: "hs78", position: "0 -6 -50", rotation: "0 180 0", scale: "4 4 4", target: "point40" }
+        ]
+      },
+      point40: {
+        skyId: "#pano40",
+        yaw: 0,
+        imageKey: "40",
+        hotspots: [
+          { id: "hs79", position: "60 -10 1", rotation: "0 90 0", scale: "6 6 6", target: "point39" },
+          { id: "hs80", position: "0 -6 -50", rotation: "0 180 0", scale: "4 4 4", target: "point41" }
+        ]
+      },
+      point41: {
+        skyId: "#pano41",
+        yaw: 82,
+        imageKey: "41",
+        hotspots: [
+          { id: "hs81", position: "-5 -10 100", rotation: "0 180 0", scale: "6 6 6", target: "point40" },
+          { id: "hs82", position: "0 -6 -60", rotation: "0 180 0", scale: "4 4 4", target: "point42" }
+        ]
+      },
+      point42: {
+        skyId: "#pano42",
+        yaw: 0,
+        imageKey: "42",
+        hotspots: [
+          { id: "hs81", position: "-5 -10 100", rotation: "0 180 0", scale: "6 6 6", target: "point41" },
+          { id: "hs82", position: "0 -6 -60", rotation: "0 180 0", scale: "4 4 4", target: "point43" }
+        ]
+      },
+      point43: {
+        skyId: "#pano43",
+        yaw: 0,
+        imageKey: "43",
+        hotspots: [
+          { id: "hs83", position: "-2 -10 80", rotation: "0 180 0", scale: "6 6 6", target: "point42" },
+          { id: "hs84", position: "10 -6 -120", rotation: "0 180 0", scale: "10 10 10", target: "point26" }
+        ]
+      },
+    };
+
+    // Preload specific image
+    function preloadImage(imageId) {
+      return new Promise((resolve, reject) => {
+        if (loadedImages.has(imageId)) {
+          resolve();
+          return;
+        }
+        
+        const img = document.querySelector(imageId);
+        if (!img) {
+          reject(new Error(`Image ${imageId} not found`));
+          return;
+        }
+        
+        img.onload = () => {
+          loadedImages.add(imageId);
+          resolve();
+        };
+        
+        img.onerror = () => {
+          console.error(`Failed to load image: ${imageId}`);
+          reject(new Error(`Failed to load ${imageId}`));
+        };
+        
+        // Force load the image
+        img.setAttribute('preload', 'auto');
+        
+        // If already cached or loaded
+        if (img.complete) {
+          loadedImages.add(imageId);
+          resolve();
+        }
+      });
+    }
+
+    // set sky rotation based on node yaw + extraYaw
+    function updateSkyRotation() {
+      const node = nodes[currentNodeId];
+      const base = node ? node.yaw : 0;
+      sky.setAttribute("rotation", `0 ${-(base + extraYaw)} 0`);
+    }
+
+    // Build hotspots for the current node
+    function buildHotspots(nodeId) {
+      hotspotsContainer.innerHTML = "";
+      const node = nodes[nodeId];
+      if (!node || !node.hotspots) return;
+
+      node.hotspots.forEach(conf => {
+        const hotspot = document.createElement("a-image");
+        hotspot.setAttribute("src", "#navArrow");
+        hotspot.setAttribute("position", conf.position);
+        hotspot.setAttribute("rotation", conf.rotation);
+        hotspot.setAttribute("scale", conf.scale);
+        hotspot.setAttribute("class", "clickable");
+        hotspot.setAttribute("data-target", conf.target); // Store target in data attribute
+        
+        // Store original and hover scales as data attributes
+        const scaleArray = conf.scale.split(' ').map(Number);
+        const hoverScale = scaleArray.map(s => s * 1.2).join(' ');
+        
+        hotspot.setAttribute("data-original-scale", conf.scale);
+        hotspot.setAttribute("data-hover-scale", hoverScale);
+        
+        // Add animation for visual feedback
+        hotspot.setAttribute("animation", {
+          property: "scale",
+          from: conf.scale,
+          to: hoverScale,
+          dir: "alternate",
+          dur: 1000,
+          loop: true,
+          easing: "easeInOutSine"
+        });
+        
+        // Add mouse events for desktop interaction
+        hotspot.addEventListener('mouseenter', () => {
+          if (!isLoading && !isInVR) {
+            hotspot.setAttribute('animation', {
+              property: 'scale',
+              to: hoverScale,
+              dur: 200,
+              easing: 'easeOutQuad'
+            });
+          }
+        });
+        
+        hotspot.addEventListener('mouseleave', () => {
+          if (!isLoading && !isInVR) {
+            hotspot.setAttribute('animation', {
+              property: 'scale',
+              to: conf.scale,
+              dur: 200,
+              easing: 'easeOutQuad'
+            });
+          }
+        });
+        
+        // Add click event for direct interaction (fallback)
+        hotspot.addEventListener('click', (evt) => {
+          if (!isLoading && !isInVR) {
+            evt.stopPropagation();
+            loadNode(conf.target);
+          }
+        });
+        
+        hotspotsContainer.appendChild(hotspot);
+      });
+      
+      console.log("Built hotspots for", nodeId);
+    }
+
+    // central function to switch nodes (panorama)
+    async function loadNode(nodeId) {
+      if (isLoading) return;
+      
+      const node = nodes[nodeId];
+      if (!node) {
+        console.warn("node not found:", nodeId);
+        return;
+      }
+
+      isLoading = true;
+      currentNodeId = nodeId;
+      
+      // Show loading overlay
+      if (!loadedImages.has(node.skyId)) {
+        showLoadingOverlay();
+      }
+      
+      try {
+        // Preload the image before setting it
+        await preloadImage(node.skyId);
+        
+        // set the sky texture
+        sky.setAttribute("src", node.skyId);
+
+        // reset any extra yaw and apply sky rotation
+        extraYaw = 0;
+        updateSkyRotation();
+
+        // rotate the camera to face the node's base yaw
+        camera.setAttribute("rotation", `0 ${node.yaw} 0`);
+
+        // build hotspots for the newly loaded node
+        buildHotspots(nodeId);
+
+        console.log("✓ Now at:", currentNodeId, "with imageKey:", node.imageKey);
+      } catch (error) {
+        console.error("Failed to load node:", error);
+      } finally {
+        isLoading = false;
+        hideLoadingOverlay();
+      }
+    }
+
+    function showLoadingOverlay() {
+      if (loadingOverlay) {
+        loadingOverlay.style.display = 'flex';
+        loadingOverlay.classList.remove('fade-out');
+      }
+    }
+
+    // convenience function — kept for compatibility
+    function loadPoint(pointName) {
+      loadNode(pointName);
+    }
+
+    // Function to directly load a specific panorama by imageKey
+    function loadByImageKey(imageKey) {
+      // Find the node with matching imageKey
+      for (const nodeId in nodes) {
+        if (nodes[nodeId].imageKey === imageKey) {
+          loadNode(nodeId);
+          return true;
+        }
+      }
+      console.warn("No node found with imageKey:", imageKey);
+      return false;
+    }
+
+    // Make the loadByImageKey function globally accessible
+    window.loadByImageKey = loadByImageKey;
+    
+    // Also expose the nodes data for external access
+    window.getPanoramaNodes = () => nodes;
+    
+    // Expose exit function
+    window.exitVRTour = exitVRTour;
+    
+    // Make loadNode accessible from outside
+    window.loadNode = loadNode;
+    window.loadPoint = loadPoint;
+
+    // The scene initialization happens in the scene.loaded event handler
+  </script>
 </body>
+
 </html>
