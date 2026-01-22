@@ -18,7 +18,7 @@
     }
 
     a-scene {
-      width: 100%;
+      width: 100vw;
       height: 100vh;
     }
 
@@ -56,9 +56,7 @@
     }
 
     @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
+      to { transform: rotate(360deg); }
     }
 
     /* Exit VR Button Styles */
@@ -99,10 +97,10 @@
       font-size: 18px;
     }
 
-    /* Hide button in VR mode - REMOVED: Keep visible for Fullscreen support */
-    /* .vr-mode #exitVRBtn {
+    /* Hide button in VR mode */
+    .vr-mode #exitVRBtn {
       display: none;
-    } */
+    }
   </style>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -119,7 +117,7 @@
     <i class="fas fa-sign-out-alt"></i> Exit VR Tour
   </button>
 
-  <a-scene webxr="referenceSpaceType: local-floor" vr-mode-ui="enabled: true" cursor="rayOrigin: mouse"
+  <a-scene webxr="referenceSpaceType: local-floor" vr-mode-ui="enabled: true" cursor="rayOrigin: mouse" 
     raycaster="objects: .clickable, .arrow-target">
 
     <!-- All images lazy loaded -->
@@ -182,40 +180,43 @@
     <a-entity id="rig" position="0 0 0">
       <!-- camera needs an id so script can rotate it -->
       <a-entity id="camera" camera look-controls>
-        <!-- VR cursor for navigation (Gaze fallback) -->
-        <a-entity cursor="rayOrigin: entity; fuse: true; fuseTimeout: 1500;" raycaster="objects: .clickable"
-          geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03" material="color: #4CC3D9; shader: flat"
-          position="0 0 -1"
-          animation__click="property: scale; startEvents: click; easing: easeInCubic; dur: 150; from: 0.1 0.1 0.1; to: 1 1 1"
-          animation__fusing="property: scale; startEvents: fusing; easing: easeInCubic; dur: 1500; from: 1 1 1; to: 0.1 0.1 0.1"
-          animation__mouseleave="property: scale; startEvents: mouseleave; easing: easeInCubic; dur: 500; to: 1 1 1">
+        <!-- VR cursor for navigation -->
+        <a-entity cursor="rayOrigin: entity; fuse: true; fuseTimeout: 2000;" 
+          raycaster="objects: .clickable, .arrow-target"
+          geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
+          material="color: #4CC3D9; shader: flat"
+          position="0 0 -1">
         </a-entity>
       </a-entity>
-
-      <!-- VR Controllers (Laser Controls) -->
-      <!-- Added .arrow-target so laser intentionally hits the ground plane for our logic -->
-      <a-entity laser-controls="hand: right" raycaster="objects: .clickable, .arrow-target; far: 100"
-        line="color: red; opacity: 0.75"></a-entity>
-      <a-entity laser-controls="hand: left" raycaster="objects: .clickable, .arrow-target; far: 100"
-        line="color: red; opacity: 0.75"></a-entity>
     </a-entity>
 
     <!-- Hotspot container -->
     <a-entity id="hotspots"></a-entity>
-
+    
     <!-- Invisible ground plane for raycaster intersection -->
-    <a-plane id="groundPlane" position="0 -1.5 0" rotation="-90 0 0" width="1000" height="1000"
-      material="opacity: 0; transparent: true" visible="true" class="arrow-target"></a-plane>
-
+    <a-plane id="groundPlane" 
+      position="0 -1.5 0" 
+      rotation="-90 0 0" 
+      width="1000" 
+      height="1000" 
+      visible="false"
+      class="arrow-target"></a-plane>
+    
     <!-- Cursor-follow arrow (flat on ground) -->
     <a-entity id="cursorArrow" position="0 -1.5 -5" rotation="-90 0 0" class="clickable">
-      <a-image src="#cursorArrowImg" scale="1.5 1.5 1.5" material="shader: flat; transparent: true; alphaTest: 0.01;"
+      <a-image src="#cursorArrowImg" 
+        scale="1.5 1.5 1.5"
+        material="shader: flat; transparent: true; alphaTest: 0.01;"
         position="0 0 0">
-        <a-animation attribute="position" dur="1500" to="0 0 -0.3" direction="alternate" repeat="indefinite"
+        <a-animation attribute="position" 
+          dur="1500" 
+          to="0 0 -0.3" 
+          direction="alternate" 
+          repeat="indefinite"
           easing="ease-in-out"></a-animation>
       </a-image>
     </a-entity>
-
+    
   </a-scene>
 
   <script>
@@ -238,19 +239,8 @@
 
     // Exit VR function
     function exitVRTour() {
-      console.log("Exiting VR Tour...");
-
-      // Handle Fullscreen exit if active
-      if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement) {
-        if (document.exitFullscreen) document.exitFullscreen();
-        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-        else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
-      }
-
-      // Wait a moment for fullscreen to exit before navigating
-      setTimeout(() => {
-        window.location.href = "index.html";
-      }, 100);
+      console.log("Exiting VR Tour and returning to index.html...");
+      window.location.href = "index.html";
     }
 
     // Attach exit function to button
@@ -268,7 +258,7 @@
       console.log("VR mode entered - hiding exit button");
       document.body.classList.add("vr-mode");
     });
-
+    
     scene.addEventListener("exit-vr", () => {
       console.log("VR mode exited - showing exit button");
       document.body.classList.remove("vr-mode");
@@ -279,14 +269,14 @@
       canvas = scene.canvas;
       raycaster = scene.systems.raycaster;
       assetsManager = scene.assets;
-
+      
       // Initialize cursor arrow system
       initCursorArrow();
-
+      
       // Check if we should load a specific image from URL parameter
       const urlParams = new URLSearchParams(window.location.search);
       const imageKey = urlParams.get('image');
-
+      
       if (imageKey) {
         console.log("Loading specific panorama from URL:", imageKey);
         // Load the specific image from URL parameter
@@ -752,26 +742,26 @@
           resolve();
           return;
         }
-
+        
         const img = document.querySelector(imageId);
         if (!img) {
           reject(new Error(`Image ${imageId} not found`));
           return;
         }
-
+        
         img.onload = () => {
           loadedImages.add(imageId);
           resolve();
         };
-
+        
         img.onerror = () => {
           console.error(`Failed to load image: ${imageId}`);
           reject(new Error(`Failed to load ${imageId}`));
         };
-
+        
         // Force load the image
         img.setAttribute('preload', 'auto');
-
+        
         // If already cached or loaded
         if (img.complete) {
           loadedImages.add(imageId);
@@ -787,68 +777,55 @@
       const mouse = new THREE.Vector2(0, 0);
       let currentArrowYaw = 0;
       let isVRMode = false;
-
+      
       // Detect VR mode
       scene.addEventListener("enter-vr", () => {
         isVRMode = true;
         console.log("VR mode entered");
       });
-
+      
       scene.addEventListener("exit-vr", () => {
         isVRMode = false;
         console.log("VR mode exited");
       });
-
-      // Track mouse position (for desktop mode) - Fullscreen fix
+      
+      // Track mouse position (for desktop mode)
       canvas.addEventListener("mousemove", (event) => {
-        // ALWAYS track if not in headset mode, regardless of fullscreen
-        const isPresenting = scene.renderer && scene.renderer.xr && scene.renderer.xr.isPresenting;
-        if (!isPresenting) {
-          let rect = canvas.getBoundingClientRect();
-          if (document.fullscreenElement) {
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-          } else {
-            mouse.x = (event.clientX / rect.width) * 2 - 1;
-            mouse.y = -(event.clientY / rect.height) * 2 + 1;
-          }
+        if (!isVRMode) {
+          mouse.x = (event.clientX / canvas.clientWidth) * 2 - 1;
+          mouse.y = -(event.clientY / canvas.clientHeight) * 2 + 1;
         }
       });
-
+      
       // Add click handler for navigation (on arrow and scene)
       cursorArrow.addEventListener("click", handleArrowClick);
       scene.addEventListener("click", handleArrowClick);
-
+      
       // VR gaze-based click (fuse timeout)
       cursorArrow.addEventListener("fusing", () => {
-        const isPresenting = scene.renderer && scene.renderer.xr && scene.renderer.xr.isPresenting;
-        if (isPresenting) {
+        if (isVRMode) {
           console.log("VR fuse detected on arrow");
           handleArrowClick();
         }
       });
-
+      
       // Also handle click events in VR (controller clicks)
       cursorArrow.addEventListener("click", (evt) => {
-        // Only prioritize headset clicks if presenting
-        const isPresenting = scene.renderer && scene.renderer.xr && scene.renderer.xr.isPresenting;
-        if (isPresenting && currentAlignedTarget) {
+        if (isVRMode && currentAlignedTarget) {
           handleArrowClick(evt);
         }
       });
-
+      
       function handleArrowClick(event) {
         if (isNavigating || isLoading) {
           console.log("Already navigating or loading, ignoring click");
           return;
         }
-
-        // Ensure we are allowed to click
-        // If in "VR Mode" (fullscreen) but NOT presenting (Headset), allow mouse
-        // If presenting, only allow if we have a target
-
+        
         console.log("Click detected! Arrow yaw:", currentArrowYaw.toFixed(1) + "°");
-
+        console.log("Current aligned target:", currentAlignedTarget);
+        console.log("Available hotspots:", currentHotspotDirections.map(h => h.target + " @ " + h.yaw.toFixed(1) + "°"));
+        
         if (currentAlignedTarget) {
           console.log("✓ Navigating to:", currentAlignedTarget, "from:", currentNodeId);
           loadNode(currentAlignedTarget);
@@ -856,109 +833,92 @@
           console.log("✗ No target aligned. Try moving cursor closer to a navigation point.");
         }
       }
-
+      
       // Update arrow based on raycaster intersection with ground plane
       function updateArrow() {
+        // Get camera object
         const cameraObj = camera.getObject3D("camera");
         if (!cameraObj) return;
-
-        let raycasterObj = null;
-        let intersectionPoint = null;
-
-        // Check if we are truly in VR Headset mode
-        const isPresenting = scene.renderer && scene.renderer.xr && scene.renderer.xr.isPresenting;
-
-        if (isPresenting) {
-          // VR Headset Mode: Use Controller's internal Raycaster
-          const controllers = document.querySelectorAll('[laser-controls]');
-
-          for (let i = 0; i < controllers.length; i++) {
-            const el = controllers[i];
-            // Check if component exists
-            if (el.components && el.components.raycaster) {
-              // Get intersection specifically with ground plane
-              // Note: We need the el reference for groundPlane, not just the mesh
-              const hit = el.components.raycaster.getIntersection(groundPlane);
-              if (hit) {
-                intersectionPoint = hit.point;
-                // Found a hit, break loop (prefer right hand usually but whichever hits first is fine)
-                // If we want right hand preference:
-                const isRight = el.getAttribute('laser-controls').hand === 'right';
-                if (isRight || !intersectionPoint) {
-                  // If it's right hand or we haven't found a point yet, take it.
-                  // Actually simple break is enough for now.
-                  break;
-                }
-              }
-            }
-          }
-
-          // Fallback to Gaze if no controller hit
-          if (!intersectionPoint) {
-            const cameraWorldPos = new THREE.Vector3();
-            cameraObj.getWorldPosition(cameraWorldPos);
-            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(cameraObj.quaternion);
-            raycasterObj = new THREE.Raycaster(cameraWorldPos, forward);
-          }
+        
+        let raycasterObj;
+        let intersectionPoint;
+        
+        if (isVRMode) {
+          // VR mode: Use camera forward direction (gaze)
+          const cameraWorldPos = new THREE.Vector3();
+          cameraObj.getWorldPosition(cameraWorldPos);
+          
+          // Get camera forward direction
+          const forward = new THREE.Vector3(0, 0, -1);
+          forward.applyQuaternion(cameraObj.quaternion);
+          
+          // Create ray from camera forward
+          raycasterObj = new THREE.Raycaster(cameraWorldPos, forward);
         } else {
-          // Desktop/Fullscreen Mode: Mouse logic
-          // Even if A-Frame says 'enter-vr' (fullscreen), we treat it as desktop mouse
+          // Desktop mode: Use mouse position
           raycasterObj = new THREE.Raycaster();
           raycasterObj.setFromCamera(mouse, cameraObj);
         }
-
-        // Try manual raycast (Mouse or Gaze) if no direct controller hit yet
+        
+        // Intersect with ground plane
         const groundMesh = groundPlane.getObject3D("mesh");
-        if (!intersectionPoint && groundMesh && raycasterObj) {
+        if (groundMesh) {
           const intersects = raycasterObj.intersectObject(groundMesh);
+          
           if (intersects.length > 0) {
+            // Get camera world position
+            const cameraWorldPos = new THREE.Vector3();
+            cameraObj.getWorldPosition(cameraWorldPos);
+            
+            // Get intersection point on ground plane
             intersectionPoint = intersects[0].point;
+            
+            // Calculate direction from camera to intersection
+            const direction = new THREE.Vector3()
+              .subVectors(intersectionPoint, cameraWorldPos)
+              .normalize();
+            
+            // Project direction onto ground plane (flatten Y component)
+            const groundDirection = new THREE.Vector3(direction.x, 0, direction.z).normalize();
+            
+            // Use actual intersection distance, but ensure minimum distance for visibility
+            const distanceToIntersection = cameraWorldPos.distanceTo(intersectionPoint);
+            const arrowDistance = Math.max(distanceToIntersection, MIN_ARROW_DISTANCE);
+            
+            // Position arrow along ground direction
+            const arrowPosition = new THREE.Vector3()
+              .copy(cameraWorldPos)
+              .add(groundDirection.multiplyScalar(arrowDistance));
+            arrowPosition.y = GROUND_HEIGHT;
+            
+            // Calculate yaw angle using atan2 for full 360-degree rotation
+            const dx = arrowPosition.x - cameraWorldPos.x;
+            const dz = arrowPosition.z - cameraWorldPos.z;
+            currentArrowYaw = Math.atan2(dx, -dz) * (180 / Math.PI);
+            
+            // Update arrow position (flat on ground: X=-90)
+            cursorArrow.setAttribute("position", `${arrowPosition.x} ${GROUND_HEIGHT} ${arrowPosition.z}`);
+            cursorArrow.setAttribute("rotation", `-90 0 0`);
+            
+            // Rotate the arrow image itself to point in the direction of movement
+            const arrowImage = cursorArrow.querySelector("a-image");
+            if (arrowImage) {
+              // Arrow should point in the direction it's moving (yaw rotation)
+              arrowImage.setAttribute("rotation", `0 0 ${currentArrowYaw}`);
+            }
+            
+            // Check alignment with hotspot directions
+            checkHotspotAlignment(currentArrowYaw);
           }
-        }
-
-        // If we have a valid intersection point (either from controller or manual raycaster)
-        if (intersectionPoint) {
-          // Get camera X/Z to calculate distance from user (always user center)
-          const rigPos = new THREE.Vector3();
-          rig.object3D.getWorldPosition(rigPos);
-
-          // direction calculation starts here with intersectionPoint valid
-          const direction = new THREE.Vector3()
-            .subVectors(intersectionPoint, rigPos)
-            .normalize();
-
-          const groundDirection = new THREE.Vector3(direction.x, 0, direction.z).normalize();
-
-          const userDistance = rigPos.distanceTo(intersectionPoint);
-          const arrowDistance = Math.max(userDistance, MIN_ARROW_DISTANCE);
-
-          const arrowPosition = new THREE.Vector3()
-            .copy(rigPos)
-            .add(groundDirection.multiplyScalar(arrowDistance));
-          arrowPosition.y = GROUND_HEIGHT;
-
-          const dx = arrowPosition.x - rigPos.x;
-          const dz = arrowPosition.z - rigPos.z;
-          currentArrowYaw = Math.atan2(dx, -dz) * (180 / Math.PI);
-
-          cursorArrow.setAttribute("position", `${arrowPosition.x} ${GROUND_HEIGHT} ${arrowPosition.z}`);
-          cursorArrow.setAttribute("rotation", `-90 0 0`);
-
-          const arrowImage = cursorArrow.querySelector("a-image");
-          if (arrowImage) {
-            arrowImage.setAttribute("rotation", `0 0 ${currentArrowYaw}`);
-          }
-
-          checkHotspotAlignment(currentArrowYaw);
         }
       }
-
+      
       // Check if arrow direction aligns with any hotspot
       function checkHotspotAlignment(arrowYaw) {
         let alignedTarget = null;
         let minDifference = ALIGNMENT_THRESHOLD;
         let closestHotspot = null;
-
+        
         currentHotspotDirections.forEach(hotspot => {
           // Compare arrow yaw with hotspot yaw
           const diff = angleDifference(arrowYaw, hotspot.yaw);
@@ -968,7 +928,7 @@
             closestHotspot = hotspot;
           }
         });
-
+        
         // Update aligned target
         if (alignedTarget !== currentAlignedTarget) {
           currentAlignedTarget = alignedTarget;
@@ -986,7 +946,7 @@
           }
         }
       }
-
+      
       // Continuous update loop
       function tick() {
         updateArrow();
@@ -1012,7 +972,7 @@
       node.hotspots.forEach(conf => {
         // Calculate hotspot yaw from position
         const hotspotYaw = positionToYaw(conf.position);
-
+        
         // Store hotspot direction for alignment detection
         currentHotspotDirections.push({
           yaw: hotspotYaw,
@@ -1020,14 +980,14 @@
           id: conf.id
         });
       });
-
+      
       console.log("Built hotspots for", nodeId, ":", currentHotspotDirections.map(h => h.target + " @ " + h.yaw.toFixed(1) + "°"));
     }
 
     // central function to switch nodes (panorama)
     async function loadNode(nodeId) {
       if (isLoading) return;
-
+      
       const node = nodes[nodeId];
       if (!node) {
         console.warn("node not found:", nodeId);
@@ -1038,16 +998,16 @@
       currentNodeId = nodeId;
       currentAlignedTarget = null;
       isNavigating = false;
-
+      
       // Show loading overlay
       if (!loadedImages.has(node.skyId)) {
         showLoadingOverlay();
       }
-
+      
       try {
         // Preload the image before setting it
         await preloadImage(node.skyId);
-
+        
         // set the sky texture
         sky.setAttribute("src", node.skyId);
 
@@ -1060,7 +1020,7 @@
 
         // build hotspots for the newly loaded node
         buildHotspots(nodeId);
-
+        
         // Reset arrow scale
         const arrowImage = cursorArrow.querySelector("a-image");
         if (arrowImage) {
@@ -1103,13 +1063,13 @@
 
     // Make the loadByImageKey function globally accessible
     window.loadByImageKey = loadByImageKey;
-
+    
     // Also expose the nodes data for external access
     window.getPanoramaNodes = () => nodes;
-
+    
     // Expose exit function
     window.exitVRTour = exitVRTour;
-
+    
     // Make loadNode accessible from outside
     window.loadNode = loadNode;
     window.loadPoint = loadPoint;
@@ -1117,5 +1077,6 @@
     // The scene initialization happens in the scene.loaded event handler
   </script>
 </body>
+
 
 </html>
