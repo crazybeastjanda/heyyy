@@ -130,6 +130,9 @@
   <!-- SKY (FIXED IN WORLD SPACE) -->
   <a-sky id="sky" src="#pano1" rotation="0 90 0"></a-sky>
 
+  <!-- HOTSPOTS (FIXED IN WORLD SPACE) -->
+  <a-entity id="hotspots"></a-entity>
+
   <!-- ROTATION CONTAINER (ROTATES WITH THUMBSTICK) -->
   <a-entity id="turnRoot" thumbstick-rig-turn="speed: 90; deadzone: 0.15">
     
@@ -152,19 +155,16 @@
       </a-entity>
     </a-entity>
 
-    <!-- VR CONTROLLERS (ROTATE WITH VIEW) -->
-    <a-entity laser-controls="hand: right"
-              raycaster="objects: .clickable; far: 100">
-    </a-entity>
-
-    <a-entity laser-controls="hand: left"
-              raycaster="objects: .clickable; far: 100">
-    </a-entity>
-
   </a-entity>
 
-  <!-- HOTSPOTS (FIXED IN WORLD SPACE - OUTSIDE ROTATION) -->
-  <a-entity id="hotspots"></a-entity>
+  <!-- VR CONTROLLERS -->
+  <a-entity laser-controls="hand: right"
+            raycaster="objects: .clickable; far: 100">
+  </a-entity>
+
+  <a-entity laser-controls="hand: left"
+            raycaster="objects: .clickable; far: 100">
+  </a-entity>
 
 </a-scene>
 
@@ -247,11 +247,6 @@ AFRAME.registerComponent("thumbstick-rig-turn", {
     
     // Apply rotation to the turnRoot container
     this.el.object3D.rotation.y = THREE.MathUtils.degToRad(this.yaw);
-    
-    // Update hotspot counter-rotations if needed
-    if (window.updateHotspotRotations) {
-      window.updateHotspotRotations();
-    }
   }
 });
 
@@ -714,18 +709,7 @@ function buildHotspots(node) {
     const el = document.createElement("a-image");
     el.setAttribute("src", "#navArrow");
     el.setAttribute("position", h.position);
-    
-    // Store the base rotation from config
-    const baseRotation = h.rotation;
-    const baseRotationValues = baseRotation.split(' ').map(Number);
-    
-    // Set initial rotation
-    el.object3D.rotation.set(
-      THREE.MathUtils.degToRad(baseRotationValues[0]),
-      THREE.MathUtils.degToRad(baseRotationValues[1]),
-      THREE.MathUtils.degToRad(baseRotationValues[2])
-    );
-    
+    el.setAttribute("rotation", h.rotation);
     el.setAttribute("scale", h.scale);
     el.setAttribute("class", "clickable");
 
@@ -742,10 +726,9 @@ function buildHotspots(node) {
       easing: "easeInOutSine"
     });
 
-    // Store hotspot data for counter-rotation
+    // Store hotspot data
     currentHotspots.push({
       element: el,
-      baseRotation: h.rotation,
       target: h.target
     });
 
@@ -759,39 +742,7 @@ function buildHotspots(node) {
 
     hotspotsContainer.appendChild(el);
   });
-  
-  // Update hotspot rotations immediately
-  updateHotspotRotations();
 }
-
-/* ===========================
-   HOTSPOT ROTATION UPDATER
-=========================== */
-function updateHotspotRotations() {
-  if (!turnRoot || currentHotspots.length === 0) return;
-  
-  // Get current turnRoot rotation
-  const turnYaw = turnRoot.object3D.rotation.y;
-  
-  // Apply counter-rotation to each hotspot
-  currentHotspots.forEach(hotspot => {
-    if (hotspot.element.object3D) {
-      const baseValues = hotspot.baseRotation.split(' ').map(Number);
-      
-      // Counter-rotate by subtracting turnRoot's yaw
-      const currentYaw = baseValues[1] - THREE.MathUtils.radToDeg(turnYaw);
-      
-      hotspot.element.object3D.rotation.set(
-        THREE.MathUtils.degToRad(baseValues[0]),
-        THREE.MathUtils.degToRad(currentYaw),
-        THREE.MathUtils.degToRad(baseValues[2])
-      );
-    }
-  });
-}
-
-// Make updateHotspotRotations globally accessible for the thumbstick component
-window.updateHotspotRotations = updateHotspotRotations;
 
 /* ===========================
    INIT
