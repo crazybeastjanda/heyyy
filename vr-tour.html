@@ -1,14 +1,15 @@
 <!DOCTYPE html>
 <html>
-
 <head>
   <meta charset="utf-8" />
   <title>360 Street View Tour</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+
   <style>
-    html,
-    body {
+    html, body {
       margin: 0;
       padding: 0;
       width: 100%;
@@ -17,627 +18,840 @@
       background: #000;
     }
 
-    a-scene {
-      width: 100vw;
-      height: 100vh;
+    #loadingOverlay {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      z-index: 9999;
+      color: white;
+      font-family: Arial;
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid rgba(255,255,255,.3);
+      border-top-color: #4CC3D9;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 15px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    #exitVRBtn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      padding: 10px 20px;
+      border-radius: 25px;
+      border: none;
+      background: #ff3b3b;
+      color: white;
+      cursor: pointer;
+    }
+
+    .vr-mode #exitVRBtn {
+      display: none;
     }
   </style>
 </head>
 
 <body>
-  <a-scene webxr="referenceSpaceType: local-floor" vr-mode-ui="enabled: true" cursor="rayOrigin: mouse"
-    raycaster="objects: .clickable">
 
-    <a-assets>
-      <!-- Panos -->
-<img id="pano1" src="assate/img1.avif">
-<img id="pano2" src="assate/img2.avif">
-<img id="pano3" src="assate/img3.avif">
-<img id="pano4" src="assate/img4.avif">
-<img id="pano5" src="assate/img5.avif">
-<img id="pano6" src="assate/img6.avif">
-<img id="pano7" src="assate/img7.avif">
-<img id="pano8" src="assate/img8.avif">
-<img id="pano9" src="assate/img9.avif">
-<img id="pano10" src="assate/img10.avif">
-<img id="pano11" src="assate/img11.avif">
-<img id="pano12" src="assate/img12.avif">
-<img id="pano13" src="assate/img13.avif">
-<img id="pano14" src="assate/img14.avif">
-<img id="pano15" src="assate/img15.avif">
-<img id="pano16" src="assate/img16.avif">
-<img id="pano17" src="assate/img17.avif">
-<img id="pano18" src="assate/img18.avif">
-<img id="pano19" src="assate/img19.avif">
-<img id="pano20" src="assate/img20.avif">
-<img id="pano21" src="assate/img21.avif">
-<img id="pano22" src="assate/img22.avif">
-<img id="pano23" src="assate/img23.avif">
-<img id="pano24" src="assate/img24.avif">
-<img id="pano25" src="assate/img25.avif">
-<img id="pano26" src="assate/img26.avif">
-<img id="pano27" src="assate/img27.avif">
-<img id="pano28" src="assate/img28.avif">
-<img id="pano29" src="assate/img29.avif">
-<img id="pano30" src="assate/img30.avif">
-<img id="pano31" src="assate/img31.avif">
-<img id="pano32" src="assate/img32.avif">
-<img id="pano33" src="assate/img33.avif">
-<img id="pano34" src="assate/img34.avif">
-<img id="pano35" src="assate/img35.avif">
-<img id="pano36" src="assate/img36.avif">
-<img id="pano37" src="assate/img37.avif">
-<img id="pano38" src="assate/img38.avif">
-<img id="pano39" src="assate/img39.avif">
-<img id="pano40" src="assate/img40.avif">
-<img id="pano41" src="assate/img41.avif">
-<img id="pano42" src="assate/img42.avif">
-<img id="pano43" src="assate/img43.avif">
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  Loading panorama...
+</div>
 
-      <!-- Location Icon -->
-      <img id="locIcon" src="images/pin.png">
-    </a-assets>
+<button id="exitVRBtn" onclick="exitVRTour()">Exit VR</button>
 
-    <!-- ROOT CONTAINER FOR THUMBSTICK ROTATION -->
-    <a-entity id="turnRoot" rotation="0 0 0">
-      <!-- SKY (inside rotation container so it rotates with thumbstick) -->
-      <a-sky id="sky" src="#pano1" rotation="0 90 0" material="shader: flat;"></a-sky>
+<a-scene
+  webxr="referenceSpaceType: local-floor"
+  vr-mode-ui="enabled: true"
+  renderer="antialias: true"
+  raycaster="objects: .clickable">
 
-      <!-- Camera rig (inside rotation container so it rotates with thumbstick) -->
-      <a-entity id="rig" position="0 0 0">
-        <!-- camera needs an id so script can rotate it -->
-        <a-entity id="camera" camera look-controls></a-entity>
+  <!-- ASSETS -->
+  <a-assets timeout="30000">
+    <img id="pano1" src="Assets/img1.avif">
+    <img id="pano2" src="Assets/img2.avif">
+    <img id="pano3" src="Assets/img3.avif">
+    <img id="pano4" src="Assets/img4.avif">
+    <img id="pano5" src="Assets/img5.avif">
+    <img id="pano6" src="Assets/img6.avif">
+    <img id="pano7" src="Assets/img7.avif">
+    <img id="pano8" src="Assets/img8.avif">
+    <img id="pano9" src="Assets/img9.avif">
+    <img id="pano10" src="Assets/img10.avif">
+    <img id="pano11" src="Assets/img11.avif">
+    <img id="pano12" src="Assets/img12.avif">
+    <img id="pano13" src="Assets/img13.avif">
+    <img id="pano14" src="Assets/img14.avif">
+    <img id="pano15" src="Assets/img15.avif">
+    <img id="pano16" src="Assets/img16.avif">
+    <img id="pano17" src="Assets/img17.avif">
+    <img id="pano18" src="Assets/img18.avif">
+    <img id="pano19" src="Assets/img19.avif">
+    <img id="pano20" src="Assets/img20.avif">
+    <img id="pano21" src="Assets/img21.avif">
+    <img id="pano22" src="Assets/img22.avif">
+    <img id="pano23" src="Assets/img23.avif">
+    <img id="pano24" src="Assets/img24.avif">
+    <img id="pano25" src="Assets/img25.avif">
+    <img id="pano26" src="Assets/img26.avif">
+    <img id="pano27" src="Assets/img27.avif">
+    <img id="pano28" src="Assets/img28.avif">
+    <img id="pano29" src="Assets/img29.avif">
+    <img id="pano30" src="Assets/img30.avif">
+    <img id="pano31" src="Assets/img31.avif">
+    <img id="pano32" src="Assets/img32.avif">
+    <img id="pano33" src="Assets/img33.avif">
+    <img id="pano34" src="Assets/img34.avif">
+    <img id="pano35" src="Assets/img35.avif">
+    <img id="pano36" src="Assets/img36.avif">
+    <img id="pano37" src="Assets/img37.avif">
+    <img id="pano38" src="Assets/img38.avif">
+    <img id="pano39" src="Assets/img39.avif">
+    <img id="pano40" src="Assets/img40.avif">
+    <img id="pano41" src="Assets/img41.avif">
+    <img id="pano42" src="Assets/img42.avif">
+    <img id="pano43" src="Assets/img43.avif">
+    <img id="navArrow" src="Assets/arrow.png.png">
+  </a-assets>
+
+  <!-- SKY (FIXED IN WORLD SPACE) -->
+  <a-sky id="sky" src="#pano1" rotation="0 90 0"></a-sky>
+
+  <!-- ROTATION CONTAINER (ROTATES WITH THUMBSTICK) -->
+  <a-entity id="turnRoot" thumbstick-rig-turn="speed: 90; deadzone: 0.15">
+    
+    <!-- CAMERA RIG -->
+    <a-entity id="rig">
+      <!-- Camera with head tracking -->
+      <a-entity id="camera"
+                camera
+                look-controls="pointerLockEnabled: false"
+                wasd-controls="enabled: false">
+
+        <!-- Desktop cursor -->
+        <a-entity cursor="rayOrigin: mouse"
+                  raycaster="objects: .clickable"
+                  geometry="primitive: ring; radiusInner: 0.015; radiusOuter: 0.025"
+                  material="color: #4CC3D9"
+                  position="0 0 -1">
+        </a-entity>
+
       </a-entity>
     </a-entity>
 
-    <!-- HOTSPOT CONTAINER (OUTSIDE rotation container - fixed in world space) -->
-    <a-entity id="hotspots"></a-entity>
+    <!-- VR CONTROLLERS (ROTATE WITH VIEW) -->
+    <a-entity laser-controls="hand: right"
+              raycaster="objects: .clickable; far: 100">
+    </a-entity>
 
-    <!-- Counter-rotation container to maintain hotspot visibility -->
-    <a-entity id="hotspotStabilizer" rotation="0 0 0"></a-entity>
-  </a-scene>
+    <a-entity laser-controls="hand: left"
+              raycaster="objects: .clickable; far: 100">
+    </a-entity>
 
-  <script>
-    const scene = document.querySelector("a-scene");
-    const sky = document.querySelector("#sky");
-    const camera = document.querySelector("#camera");
-    const hotspotsContainer = document.querySelector("#hotspots");
-    const turnRoot = document.querySelector("#turnRoot");
-    const hotspotStabilizer = document.querySelector("#hotspotStabilizer");
-    let canvas = null;
+  </a-entity>
 
-    // scene canvas for cursor change
-    scene.addEventListener("loaded", () => {
-      canvas = scene.canvas;
+  <!-- HOTSPOTS (FIXED IN WORLD SPACE - OUTSIDE ROTATION) -->
+  <a-entity id="hotspots"></a-entity>
+
+</a-scene>
+
+<script>
+/* ===============================
+   THUMBSTICK RIG TURN COMPONENT
+================================ */
+AFRAME.registerComponent("thumbstick-rig-turn", {
+  schema: {
+    speed: { default: 90 },     // degrees per second
+    deadzone: { default: 0.15 }
+  },
+
+  init() {
+    this.axisX = 0;
+    this.yaw = 0;
+
+    this.onThumbstickMoved = (evt) => {
+      const x = evt.detail.x ?? 0;
+
+      // Apply deadzone
+      if (Math.abs(x) < this.data.deadzone) {
+        this.axisX = 0;
+      } else {
+        this.axisX = x;
+      }
+    };
+    
+    // Clean up function
+    this.removeEventListeners = () => {
+      document.querySelectorAll("[laser-controls]").forEach(ctrl => {
+        ctrl.removeEventListener("thumbstickmoved", this.onThumbstickMoved);
+      });
+    };
+  },
+
+  play() {
+    const sceneEl = this.el.sceneEl;
+    
+    // Add listeners when entering VR
+    sceneEl.addEventListener("enter-vr", () => {
+      console.log("VR entered - setting up thumbstick listeners");
+      document.querySelectorAll("[laser-controls]").forEach(ctrl => {
+        ctrl.addEventListener("thumbstickmoved", this.onThumbstickMoved);
+      });
+      
+      // Also add listener for controller connected events
+      sceneEl.addEventListener("controllerconnected", (e) => {
+        console.log("Controller connected, adding thumbstick listener");
+        const controller = e.detail;
+        if (controller) {
+          controller.addEventListener("thumbstickmoved", this.onThumbstickMoved);
+        }
+      });
+      
+      // Add VR mode class to body
+      document.body.classList.add("vr-mode");
     });
 
-    // current node id tracker
-    let currentNodeId = "point1";
-    let extraYaw = 0;
+    // Remove listeners when exiting VR
+    sceneEl.addEventListener("exit-vr", () => {
+      console.log("VR exited - cleaning up thumbstick listeners");
+      this.removeEventListeners();
+      this.axisX = 0; // Reset axis to prevent drift
+      document.body.classList.remove("vr-mode");
+    });
+  },
+
+  pause() {
+    // Clean up listeners when component is paused
+    this.removeEventListeners();
+  },
+
+  tick(time, delta) {
+    // Only rotate if axisX is not 0
+    if (this.axisX === 0) return;
+
+    const turn = this.axisX * this.data.speed * (delta / 1000);
+    this.yaw -= turn;
     
-    // Thumbstick rotation state
-    let isTurning = false;
-    let turnSpeed = 0;
-    const TURN_SPEED = 60; // degrees per second
-    const DEADZONE = 0.15;
-    let lastTime = 0;
-
-    // All config in one object: pano + base yaw + hotspots
-    const nodes = {
-      point1: {
-        skyId: "#pano1",
-        yaw: 90,
-        hotspots: [
-          { id: "hs1", position: "-10 -1 -2", rotation: "0 -90 0", scale: "1.5 1.5 1.5", target: "point2" },
-          { id: "hs2", position: "20 -1 0", rotation: "0 90 0", scale: "1.5 1.5 1.5", target: "point3" },
-          { id: "hs3", position: "20 -1 -20", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point4" }
-        ]
-      },
-      point2: {
-        skyId: "#pano2",
-        yaw: 85,
-        hotspots: [
-          { id: "hs4", position: "0 -0.5 -5", rotation: "0 180 0", scale: "1 1 1", target: "point1" }
-        ]
-      },
-      point3: {
-        skyId: "#pano3",
-        yaw: -25,
-        hotspots: [
-          { id: "hs5", position: "-10 -1 -25", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point1" }
-        ]
-      },
-      point4: {
-        skyId: "#pano4",
-        yaw: -90,
-        hotspots: [
-          { id: "hs6", position: "-3 -1 6", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point1" },
-          { id: "hs7", position: "-2 -0.9 -30", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point5" }
-        ]
-      },
-      point5: {
-        skyId: "#pano5",
-        yaw: -90,
-        hotspots: [
-          { id: "hs8", position: "-2 -1 13", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point4" },
-          { id: "hs9", position: "2 -0.9 -20", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point6" }
-        ]
-      },
-      point6: {
-        skyId: "#pano6",
-        yaw: -90,
-        hotspots: [
-          { id: "hs10", position: "0.8 -0.9 15", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point5" },
-          { id: "hs11", position: "-1 -1 -25", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point7" }
-        ]
-      },
-      point7: {
-        skyId: "#pano7",
-        yaw: 90,
-        hotspots: [
-          { id: "hs12", position: "0 -1 30", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point6" },
-          { id: "hs13", position: "0 -1 -20", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point8" }
-        ]
-      },
-      point8: {
-        skyId: "#pano8",
-        yaw: -90,
-        hotspots: [
-          { id: "hs14", position: "-2 -1 20", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point7" },
-          { id: "hs15", position: "-15 -1 -30", rotation: "0 0 0", scale: "2 2 2", target: "point9" }
-        ]
-      },
-      point9: {
-        skyId: "#pano9",
-        yaw: -205,
-        hotspots: [
-          { id: "hs16", position: "5 -1 20", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point8" },
-          { id: "hs17", position: "0 -2 -20", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point10" },
-          { id: "hs46", position: "150 -2 -10", rotation: "0 90 0", scale: "8 8 8", target: "point21" }
-        ]
-      },
-      point10: {
-        skyId: "#pano10",
-        yaw: -80,
-        hotspots: [
-          { id: "hs18", position: "13 -1 1", rotation: "0 90 0", scale: "1.5 1.5 1.5", target: "point9" },
-          { id: "hs19", position: "1 -1 -20", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point11" }
-        ]
-      },
-      point11: {
-        skyId: "#pano11",
-        yaw: 90,
-        hotspots: [
-          { id: "hs20", position: "2 -1 12", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point10" },
-          { id: "hs21", position: "-2.8 -2 -15", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point12" }
-        ]
-      },
-      point12: {
-        skyId: "#pano12",
-        yaw: -90,
-        hotspots: [
-          { id: "hs22", position: "3.2 -5 15", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point11" },
-          { id: "hs23", position: "-18 -2 -15", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point13" }
-        ]
-      },
-      point13: {
-        skyId: "#pano13",
-        yaw: 90,
-        hotspots: [
-          { id: "hs24", position: "10 -1 12", rotation: "0 45 0", scale: "1.5 1.5 1.5", target: "point12" },
-          { id: "hs25", position: "10 -4 -18", rotation: "0 0 0", scale: "2 2 2", target: "point14" }
-        ]
-      },
-      point14: {
-        skyId: "#pano14",
-        yaw: -80,
-        hotspots: [
-          { id: "hs26", position: "0 -4 15", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point13" },
-          { id: "hs27", position: "0 -4 -25", rotation: "0 0 0", scale: "2 2 2", target: "point15" }
-        ]
-      },
-      point15: {
-        skyId: "#pano15",
-        yaw: 180,
-        hotspots: [
-          { id: "hs28", position: "0 -1 13", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point14" },
-          { id: "hs29", position: "2 -4 -20", rotation: "0 0 0", scale: "2 2 2", target: "point16" }
-
-        ]
-      },
-      point16: {
-        skyId: "#pano16",
-        yaw: 180,
-        hotspots: [
-          { id: "hs30", position: "2 -1 20", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point15" },
-          { id: "hs31", position: "-6 -4 -15", rotation: "0 0 0", scale: "2 2 2", target: "point17" },
-          { id: "hs32", position: "-3.2 -4 -20", rotation: "0 0 0", scale: "2 2 2", target: "point18" }
-        ]
-      },
-      point17: {
-        skyId: "#pano17",
-        yaw: -145,
-        hotspots: [
-          { id: "hs33", position: "8 -3 -1.8", rotation: "0 90 0", scale: "1.5 1.5 1.5", target: "point16" },
-          { id: "hs34", position: "-4 -4 -15", rotation: "0 0 0", scale: "2 2 2", target: "point18" }
-        ]
-      },
-      point18: {
-        skyId: "#pano18",
-        yaw: 0,
-        hotspots: [
-          { id: "hs35", position: "10 -4 5", rotation: "0 90 0", scale: "1.5 1.5 1.5", target: "point17" },
-          { id: "hs36", position: "8 -4 -12", rotation: "0 135 0", scale: "1.5 1.5 1.5", target: "point19" },
-          { id: "hs37", position: "-10 -4 -1.5", rotation: "0 90 0", scale: "1.5 1.5 1.5", target: "point20" },
-        ]
-      },
-      point19: {
-        skyId: "#pano19",
-        yaw: -90,
-        hotspots: [
-          { id: "hs38", position: "9 -6 -19", rotation: "0 135 0", scale: "2 2 2", target: "point18" },
-        ]
-      },
-      point20: {
-        skyId: "#pano20",
-        yaw: 0,
-        hotspots: [
-          { id: "hs38", position: "30 -6 2", rotation: "0 90 0", scale: "3 3 3", target: "point18" },
-          { id: "hs39", position: "25 -6 -105", rotation: "0 0 0", scale: "6 6 6", target: "point21" },
-          { id: "hs40", position: "-20 -6 -30", rotation: "0 0 0", scale: "6 6 6", target: "point22" },
-        ]
-      },
-      point21: {
-        skyId: "#pano21",
-        yaw: 90,
-        hotspots: [
-          { id: "hs41", position: "35 -6 -165", rotation: "0 180 0", scale: "10 10 10", target: "point20" },
-          { id: "hs42", position: "-145 -6 1", rotation: "0 90 0", scale: "7 7 7", target: "point9" },
-        ]
-      },
-      point22: {
-        skyId: "#pano22",
-        yaw: -90,
-        hotspots: [
-          { id: "hs43", position: "0 -6 -15", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point23" },
-          { id: "hs44", position: "-30 -6 30", rotation: "0 0 0", scale: "3 3 3", target: "point20" },
-          { id: "hs45", position: "35 -6 20", rotation: "0 45 0", scale: "3 3 3", target: "point21" }
-        ]
-      },
-      // hs46 is in point9
-      point23: {
-        skyId: "#pano23",
-        yaw: -90,
-        hotspots: [
-          { id: "hs47", position: "1 -6 40", rotation: "0 180 0", scale: "4 4 4", target: "point22" },
-          { id: "hs48", position: "3 -6 -60", rotation: "0 180 0", scale: "6 6 6", target: "point24" }
-
-        ]
-      },
-      point24: {
-        skyId: "#pano24",
-        yaw: -120,
-        hotspots: [
-          { id: "hs49", position: "1 -6 40", rotation: "0 180 0", scale: "4 4 4", target: "point23" },
-          { id: "hs50", position: "3 -6 -60", rotation: "0 180 0", scale: "6 6 6", target: "point25" }
-
-        ]
-      },
-      point25: {
-        skyId: "#pano25",
-        yaw: 90,
-        hotspots: [
-          { id: "hs51", position: "1 -6 40", rotation: "0 180 0", scale: "4 4 4", target: "point24" },
-          { id: "hs52", position: "3 -6 -60", rotation: "0 180 0", scale: "6 6 6", target: "point26" }
-        ]
-      },
-      point26: {
-        skyId: "#pano26",
-        yaw: -90,
-        hotspots: [
-          { id: "hs53", position: "-45 -6 -2", rotation: "0 90 0", scale: "4 4 4", target: "point25" },
-          { id: "hs54", position: "3 -6 -60", rotation: "0 180 0", scale: "6 6 6", target: "point27" },
-          { id: "hs55", position: "35 -6 8", rotation: "0 90 0", scale: "6 6 6", target: "point43" }
-
-        ]
-      },
-      point27: {
-        skyId: "#pano27",
-        yaw: 0,
-        hotspots: [
-          { id: "hs56", position: "1 -6 25", rotation: "0 180 0", scale: "4 4 4", target: "point26" },
-          { id: "hs57", position: "-3 -6 -60", rotation: "0 180 0", scale: "6 6 6", target: "point28" }
-        ]
-      },
-      point28: {
-        skyId: "#pano28",
-        yaw: -20,
-        hotspots: [
-          { id: "hs58", position: "-2 -6 25", rotation: "0 180 0", scale: "4 4 4", target: "point27" },
-          { id: "hs59", position: "-3 -6 -35", rotation: "0 180 0", scale: "6 6 6", target: "point31" },
-          { id: "hs60", position: "-25 -10 -3", rotation: "0 90 0", scale: "6 6 6", target: "point29" }
-        ]
-      },
-      point29: {
-        skyId: "#pano29",
-        yaw: 122,
-        hotspots: [
-          { id: "hs60", position: "4.5 -10 25", rotation: "0 180 0", scale: "4 4 4", target: "point28" },
-          { id: "hs61", position: "-3 -6 -35", rotation: "0 180 0", scale: "6 6 6", target: "point30" }
-        ]
-      },
-      point30: {
-        skyId: "#pano30",
-        yaw: 47,
-        hotspots: [
-          { id: "hs62", position: "4.5 -10 25", rotation: "0 180 0", scale: "4 4 4", target: "point29" }
-        ]
-      },
-      point31: {
-        skyId: "#pano31",
-        yaw: -95,
-        hotspots: [
-          { id: "hs63", position: "0 -10 35", rotation: "0 180 0", scale: "6 6 6", target: "point29" },
-          { id: "hs64", position: "30 -6 -4", rotation: "0 90 0", scale: "3 3 3", target: "point32" }
-        ]
-      },
-      point32: {
-        skyId: "#pano32",
-        yaw: 0,
-        hotspots: [
-          { id: "hs65", position: "0 -10 35", rotation: "0 180 0", scale: "6 6 6", target: "point31" },
-          { id: "hs66", position: "0 -6 -40", rotation: "0 180 0", scale: "6 6 6", target: "point33" }
-        ]
-      },
-      point33: {
-        skyId: "#pano33",
-        yaw: 180,
-        hotspots: [
-          { id: "hs67", position: "0 -10 100", rotation: "0 180 0", scale: "10 10 10", target: "point32" },
-          { id: "hs68", position: "0 -6 -40", rotation: "0 180 0", scale: "6 6 6", target: "point34" }
-        ]
-      },
-      point34: {
-        skyId: "#pano34",
-        yaw: 180,
-        hotspots: [
-          { id: "hs69", position: "0 -10 100", rotation: "0 180 0", scale: "10 10 10", target: "point33" },
-          { id: "hs70", position: "0 -6 -40", rotation: "0 180 0", scale: "6 6 6", target: "point35" }
-        ]
-      },
-      point35: {
-        skyId: "#pano35",
-        yaw: 180,
-        hotspots: [
-          { id: "hs71", position: "0 -10 100", rotation: "0 180 0", scale: "6 6 6", target: "point34" },
-          { id: "hs72", position: "0 -6 -40", rotation: "0 180 0", scale: "4 4 4", target: "point36" }
-        ]
-      },
-      point36: {
-        skyId: "#pano36",
-        yaw: 170,
-        hotspots: [
-          { id: "hs73", position: "0 -10 100", rotation: "0 180 0", scale: "6 6 6", target: "point35" },
-          { id: "hs74", position: "0 -6 -40", rotation: "0 180 0", scale: "4 4 4", target: "point37" }
-        ]
-      },
-      point37: {
-        skyId: "#pano37",
-        yaw: 185,
-        hotspots: [
-          { id: "hs75", position: "0 -10 100", rotation: "0 180 0", scale: "6 6 6", target: "point36" },
-          { id: "hs76", position: "0 -6 -40", rotation: "0 180 0", scale: "4 4 4", target: "point38" }
-        ]
-      },
-      point38: {
-        skyId: "#pano38",
-        yaw: -96,
-        hotspots: [
-          { id: "hs77", position: "50 -10 1", rotation: "0 90 0", scale: "6 6 6", target: "point37" },
-          { id: "hs78", position: "0 -6 -40", rotation: "0 180 0", scale: "4 4 4", target: "point39" }
-        ]
-      },
-      point39: {
-        skyId: "#pano39",
-        yaw: -5,
-        hotspots: [
-          { id: "hs77", position: "3 -10 60", rotation: "0 180 0", scale: "6 6 6", target: "point38" },
-          { id: "hs78", position: "0 -6 -50", rotation: "0 180 0", scale: "4 4 4", target: "point40" }
-        ]
-      },
-      point40: {
-        skyId: "#pano40",
-        yaw: 0,
-        hotspots: [
-          { id: "hs79", position: "60 -10 1", rotation: "0 90 0", scale: "6 6 6", target: "point39" },
-          { id: "hs80", position: "0 -6 -50", rotation: "0 180 0", scale: "4 4 4", target: "point41" }
-        ]
-      },
-      point41: {
-        skyId: "#pano41",
-        yaw: 82,
-        hotspots: [
-          { id: "hs81", position: "-5 -10 100", rotation: "0 180 0", scale: "6 6 6", target: "point40" },
-          { id: "hs82", position: "0 -6 -60", rotation: "0 180 0", scale: "4 4 4", target: "point42" }
-        ]
-      },
-      point42: {
-        skyId: "#pano42",
-        yaw: 0,
-        hotspots: [
-          { id: "hs81", position: "-5 -10 100", rotation: "0 180 0", scale: "6 6 6", target: "point41" },
-          { id: "hs82", position: "0 -6 -60", rotation: "0 180 0", scale: "4 4 4", target: "point43" }
-        ]
-      },
-      point43: {
-        skyId: "#pano43",
-        yaw: 0,
-        hotspots: [
-          { id: "hs83", position: "-2 -10 80", rotation: "0 180 0", scale: "6 6 6", target: "point42" },
-          { id: "hs84", position: "10 -6 -120", rotation: "0 180 0", scale: "10 10 10", target: "point26" }
-        ]
-      },
-    };
-
-    // set sky rotation based on node yaw + extraYaw (you can change extraYaw dynamically if needed)
-    function updateSkyRotation() {
-      const node = nodes[currentNodeId];
-      const base = node ? node.yaw : 0;
-      // negative because A-Frame sky rotation is inverse of camera yaw in some setups
-      sky.setAttribute("rotation", `0 ${-(base + extraYaw)} 0`);
+    // Apply rotation to the turnRoot container
+    this.el.object3D.rotation.y = THREE.MathUtils.degToRad(this.yaw);
+    
+    // Update hotspot counter-rotations if needed
+    if (window.updateHotspotRotations) {
+      window.updateHotspotRotations();
     }
+  }
+});
 
-    // create hotspots for the node
-    function buildHotspots(nodeId) {
-      hotspotsContainer.innerHTML = "";
-      const node = nodes[nodeId];
-      if (!node || !node.hotspots) return;
+/* ===============================
+   TOUR LOGIC
+================================ */
+const scene = document.querySelector("a-scene");
+const sky = document.getElementById("sky");
+const turnRoot = document.getElementById("turnRoot");
+const camera = document.querySelector("#camera");
+const hotspotsContainer = document.getElementById("hotspots");
+const loadingOverlay = document.getElementById("loadingOverlay");
 
-      node.hotspots.forEach(conf => {
-        const el = document.createElement("a-image");
-        el.setAttribute("id", conf.id);
-        el.setAttribute("src", "#locIcon");
-        el.setAttribute("position", conf.position);
-        el.setAttribute("rotation", conf.rotation);
-        el.setAttribute("scale", conf.scale);
-        el.setAttribute("class", "clickable");
-        el.setAttribute("material", "shader: flat; transparent: true; alphaTest: 0.01;");
+let isLoading = false;
+let currentNodeId = "point1";
+let currentHotspots = [];
 
-        // Hover: only change cursor
-        el.addEventListener("mouseenter", () => {
-          if (canvas) canvas.style.cursor = "pointer";
-        });
-        el.addEventListener("mouseleave", () => {
-          if (canvas) canvas.style.cursor = "default";
-        });
+/* ===========================
+   EXIT VR
+=========================== */
+function exitVRTour() {
+  window.location.href = "index.html";
+}
 
-        // Click: log + move to target node
-        el.addEventListener("click", (evt) => {
-          console.log("clicked hotspot:", conf.id, "-> target:", conf.target);
-          loadNode(conf.target);
-        });
+/* ===========================
+   NODES (FULL LIST)
+=========================== */
+const nodes = {
+  point1: {
+    skyId: "#pano1",
+    yaw: 90,
+    imageKey: "1",
+    hotspots: [
+      { id: "hs1", position: "-10 -1 -2", rotation: "0 -90 0", scale: "1.5 1.5 1.5", target: "point2" },
+      { id: "hs2", position: "20 -1 0", rotation: "0 90 0", scale: "1.5 1.5 1.5", target: "point3" },
+      { id: "hs3", position: "20 -1 -20", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point4" }
+    ]
+  },
+  point2: {
+    skyId: "#pano2",
+    yaw: 85,
+    imageKey: "2",
+    hotspots: [
+      { id: "hs4", position: "0 -0.5 -5", rotation: "0 180 0", scale: "1 1 1", target: "point1" }
+    ]
+  },
+  point3: {
+    skyId: "#pano3",
+    yaw: -25,
+    imageKey: "3",
+    hotspots: [
+      { id: "hs5", position: "-10 -1 -25", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point1" }
+    ]
+  },
+  point4: {
+    skyId: "#pano4",
+    yaw: -90,
+    imageKey: "4",
+    hotspots: [
+      { id: "hs6", position: "-3 -1 6", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point1" },
+      { id: "hs7", position: "-2 -0.9 -30", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point5" }
+    ]
+  },
+  point5: {
+    skyId: "#pano5",
+    yaw: -90,
+    imageKey: "5",
+    hotspots: [
+      { id: "hs8", position: "-2 -1 13", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point4" },
+      { id: "hs9", position: "2 -0.9 -20", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point6" }
+    ]
+  },
+  point6: {
+    skyId: "#pano6",
+    yaw: -90,
+    imageKey: "6",
+    hotspots: [
+      { id: "hs10", position: "0.8 -0.9 15", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point5" },
+      { id: "hs11", position: "-1 -1 -25", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point7" }
+    ]
+  },
+  point7: {
+    skyId: "#pano7",
+    yaw: 90,
+    imageKey: "7",
+    hotspots: [
+      { id: "hs12", position: "0 -1 30", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point6" },
+      { id: "hs13", position: "0 -1 -20", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point8" }
+    ]
+  },
+  point8: {
+    skyId: "#pano8",
+    yaw: -90,
+    imageKey: "8",
+    hotspots: [
+      { id: "hs14", position: "-2 -1 20", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point7" },
+      { id: "hs15", position: "-15 -1 -30", rotation: "0 0 0", scale: "2 2 2", target: "point9" }
+    ]
+  },
+  point9: {
+    skyId: "#pano9",
+    yaw: -205,
+    imageKey: "9",
+    hotspots: [
+      { id: "hs16", position: "5 -1 20", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point8" },
+      { id: "hs17", position: "0 -2 -20", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point10" },
+      { id: "hs46", position: "150 -2 -10", rotation: "0 90 0", scale: "8 8 8", target: "point21" }
+    ]
+  },
+  point10: {
+    skyId: "#pano10",
+    yaw: -80,
+    imageKey: "10",
+    hotspots: [
+      { id: "hs18", position: "13 -1 1", rotation: "0 90 0", scale: "1.5 1.5 1.5", target: "point9" },
+      { id: "hs19", position: "1 -1 -20", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point11" }
+    ]
+  },
+  point11: {
+    skyId: "#pano11",
+    yaw: 90,
+    imageKey: "11",
+    hotspots: [
+      { id: "hs20", position: "2 -1 12", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point10" },
+      { id: "hs21", position: "-2.8 -2 -15", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point12" }
+    ]
+  },
+  point12: {
+    skyId: "#pano12",
+    yaw: -90,
+    imageKey: "12",
+    hotspots: [
+      { id: "hs22", position: "3.2 -5 15", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point11" },
+      { id: "hs23", position: "-18 -2 -15", rotation: "0 0 0", scale: "1.5 1.5 1.5", target: "point13" }
+    ]
+  },
+  point13: {
+    skyId: "#pano13",
+    yaw: 90,
+    imageKey: "13",
+    hotspots: [
+      { id: "hs24", position: "10 -1 12", rotation: "0 45 0", scale: "1.5 1.5 1.5", target: "point12" },
+      { id: "hs25", position: "10 -4 -18", rotation: "0 0 0", scale: "2 2 2", target: "point14" }
+    ]
+  },
+  point14: {
+    skyId: "#pano14",
+    yaw: -80,
+    imageKey: "14",
+    hotspots: [
+      { id: "hs26", position: "0 -4 15", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point13" },
+      { id: "hs27", position: "0 -4 -25", rotation: "0 0 0", scale: "2 2 2", target: "point15" }
+    ]
+  },
+  point15: {
+    skyId: "#pano15",
+    yaw: 180,
+    imageKey: "15",
+    hotspots: [
+      { id: "hs28", position: "0 -1 13", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point14" },
+      { id: "hs29", position: "2 -4 -20", rotation: "0 0 0", scale: "2 2 2", target: "point16" }
+    ]
+  },
+  point16: {
+    skyId: "#pano16",
+    yaw: 180,
+    imageKey: "16",
+    hotspots: [
+      { id: "hs30", position: "2 -1 20", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point15" },
+      { id: "hs31", position: "-6 -4 -15", rotation: "0 0 0", scale: "2 2 2", target: "point17" },
+      { id: "hs32", position: "-3.2 -4 -20", rotation: "0 0 0", scale: "2 2 2", target: "point18" }
+    ]
+  },
+  point17: {
+    skyId: "#pano17",
+    yaw: -145,
+    imageKey: "17",
+    hotspots: [
+      { id: "hs33", position: "8 -3 -1.8", rotation: "0 90 0", scale: "1.5 1.5 1.5", target: "point16" },
+      { id: "hs34", position: "-4 -4 -15", rotation: "0 0 0", scale: "2 2 2", target: "point18" }
+    ]
+  },
+  point18: {
+    skyId: "#pano18",
+    yaw: 0,
+    imageKey: "18",
+    hotspots: [
+      { id: "hs35", position: "10 -4 5", rotation: "0 90 0", scale: "1.5 1.5 1.5", target: "point17" },
+      { id: "hs36", position: "8 -4 -12", rotation: "0 135 0", scale: "1.5 1.5 1.5", target: "point19" },
+      { id: "hs37", position: "-10 -4 -1.5", rotation: "0 90 0", scale: "1.5 1.5 1.5", target: "point20" },
+    ]
+  },
+  point19: {
+    skyId: "#pano19",
+    yaw: -90,
+    imageKey: "19",
+    hotspots: [
+      { id: "hs38", position: "9 -6 -19", rotation: "0 135 0", scale: "2 2 2", target: "point18" },
+    ]
+  },
+  point20: {
+    skyId: "#pano20",
+    yaw: 0,
+    imageKey: "20",
+    hotspots: [
+      { id: "hs38", position: "30 -6 2", rotation: "0 90 0", scale: "3 3 3", target: "point18" },
+      { id: "hs39", position: "25 -6 -105", rotation: "0 0 0", scale: "6 6 6", target: "point21" },
+      { id: "hs40", position: "-20 -6 -30", rotation: "0 0 0", scale: "6 6 6", target: "point22" },
+    ]
+  },
+  point21: {
+    skyId: "#pano21",
+    yaw: 90,
+    imageKey: "21",
+    hotspots: [
+      { id: "hs41", position: "35 -6 -165", rotation: "0 180 0", scale: "10 10 10", target: "point20" },
+      { id: "hs42", position: "-145 -6 1", rotation: "0 90 0", scale: "7 7 7", target: "point9" },
+    ]
+  },
+  point22: {
+    skyId: "#pano22",
+    yaw: -90,
+    imageKey: "22",
+    hotspots: [
+      { id: "hs43", position: "0 -6 -15", rotation: "0 180 0", scale: "1.5 1.5 1.5", target: "point23" },
+      { id: "hs44", position: "-30 -6 30", rotation: "0 0 0", scale: "3 3 3", target: "point20" },
+      { id: "hs45", position: "35 -6 20", rotation: "0 45 0", scale: "3 3 3", target: "point21" }
+    ]
+  },
+  point23: {
+    skyId: "#pano23",
+    yaw: -90,
+    imageKey: "23",
+    hotspots: [
+      { id: "hs47", position: "1 -6 40", rotation: "0 180 0", scale: "4 4 4", target: "point22" },
+      { id: "hs48", position: "3 -6 -60", rotation: "0 180 0", scale: "6 6 6", target: "point24" }
+    ]
+  },
+  point24: {
+    skyId: "#pano24",
+    yaw: -120,
+    imageKey: "24",
+    hotspots: [
+      { id: "hs49", position: "1 -6 40", rotation: "0 180 0", scale: "4 4 4", target: "point23" },
+      { id: "hs50", position: "3 -6 -60", rotation: "0 180 0", scale: "6 6 6", target: "point25" }
+    ]
+  },
+  point25: {
+    skyId: "#pano25",
+    yaw: 90,
+    imageKey: "25",
+    hotspots: [
+      { id: "hs51", position: "1 -6 40", rotation: "0 180 0", scale: "4 4 4", target: "point24" },
+      { id: "hs52", position: "3 -6 -60", rotation: "0 180 0", scale: "6 6 6", target: "point26" }
+    ]
+  },
+  point26: {
+    skyId: "#pano26",
+    yaw: -90,
+    imageKey: "26",
+    hotspots: [
+      { id: "hs53", position: "-45 -6 -2", rotation: "0 90 0", scale: "4 4 4", target: "point25" },
+      { id: "hs54", position: "3 -6 -60", rotation: "0 180 0", scale: "6 6 6", target: "point27" },
+      { id: "hs55", position: "35 -6 8", rotation: "0 90 0", scale: "6 6 6", target: "point43" }
+    ]
+  },
+  point27: {
+    skyId: "#pano27",
+    yaw: 0,
+    imageKey: "27",
+    hotspots: [
+      { id: "hs56", position: "1 -6 25", rotation: "0 180 0", scale: "4 4 4", target: "point26" },
+      { id: "hs57", position: "-3 -6 -60", rotation: "0 180 0", scale: "6 6 6", target: "point28" }
+    ]
+  },
+  point28: {
+    skyId: "#pano28",
+    yaw: -20,
+    imageKey: "28",
+    hotspots: [
+      { id: "hs58", position: "-2 -6 25", rotation: "0 180 0", scale: "4 4 4", target: "point27" },
+      { id: "hs59", position: "-3 -6 -35", rotation: "0 180 0", scale: "6 6 6", target: "point31" },
+      { id: "hs60", position: "-25 -10 -3", rotation: "0 90 0", scale: "6 6 6", target: "point29" }
+    ]
+  },
+  point29: {
+    skyId: "#pano29",
+    yaw: 122,
+    imageKey: "29",
+    hotspots: [
+      { id: "hs60", position: "4.5 -10 25", rotation: "0 180 0", scale: "4 4 4", target: "point28" },
+      { id: "hs61", position: "-3 -6 -35", rotation: "0 180 0", scale: "6 6 6", target: "point30" }
+    ]
+  },
+  point30: {
+    skyId: "#pano30",
+    yaw: 47,
+    imageKey: "30",
+    hotspots: [
+      { id: "hs62", position: "4.5 -10 25", rotation: "0 180 0", scale: "4 4 4", target: "point29" }
+    ]
+  },
+  point31: {
+    skyId: "#pano31",
+    yaw: -95,
+    imageKey: "31",
+    hotspots: [
+      { id: "hs63", position: "0 -10 35", rotation: "0 180 0", scale: "6 6 6", target: "point29" },
+      { id: "hs64", position: "30 -6 -4", rotation: "0 90 0", scale: "3 3 3", target: "point32" }
+    ]
+  },
+  point32: {
+    skyId: "#pano32",
+    yaw: 0,
+    imageKey: "32",
+    hotspots: [
+      { id: "hs65", position: "0 -10 35", rotation: "0 180 0", scale: "6 6 6", target: "point31" },
+      { id: "hs66", position: "0 -6 -40", rotation: "0 180 0", scale: "6 6 6", target: "point33" }
+    ]
+  },
+  point33: {
+    skyId: "#pano33",
+    yaw: 180,
+    imageKey: "33",
+    hotspots: [
+      { id: "hs67", position: "0 -10 100", rotation: "0 180 0", scale: "10 10 10", target: "point32" },
+      { id: "hs68", position: "0 -6 -40", rotation: "0 180 0", scale: "6 6 6", target: "point34" }
+    ]
+  },
+  point34: {
+    skyId: "#pano34",
+    yaw: 180,
+    imageKey: "34",
+    hotspots: [
+      { id: "hs69", position: "0 -10 100", rotation: "0 180 0", scale: "10 10 10", target: "point33" },
+      { id: "hs70", position: "0 -6 -40", rotation: "0 180 0", scale: "6 6 6", target: "point35" }
+    ]
+  },
+  point35: {
+    skyId: "#pano35",
+    yaw: 180,
+    imageKey: "35",
+    hotspots: [
+      { id: "hs71", position: "0 -10 100", rotation: "0 180 0", scale: "6 6 6", target: "point34" },
+      { id: "hs72", position: "0 -6 -40", rotation: "0 180 0", scale: "4 4 4", target: "point36" }
+    ]
+  },
+  point36: {
+    skyId: "#pano36",
+    yaw: 170,
+    imageKey: "36",
+    hotspots: [
+      { id: "hs73", position: "0 -10 100", rotation: "0 180 0", scale: "6 6 6", target: "point35" },
+      { id: "hs74", position: "0 -6 -40", rotation: "0 180 0", scale: "4 4 4", target: "point37" }
+    ]
+  },
+  point37: {
+    skyId: "#pano37",
+    yaw: 185,
+    imageKey: "37",
+    hotspots: [
+      { id: "hs75", position: "0 -10 100", rotation: "0 180 0", scale: "6 6 6", target: "point36" },
+      { id: "hs76", position: "0 -6 -40", rotation: "0 180 0", scale: "4 4 4", target: "point38" }
+    ]
+  },
+  point38: {
+    skyId: "#pano38",
+    yaw: -96,
+    imageKey: "38",
+    hotspots: [
+      { id: "hs77", position: "50 -10 1", rotation: "0 90 0", scale: "6 6 6", target: "point37" },
+      { id: "hs78", position: "0 -6 -40", rotation: "0 180 0", scale: "4 4 4", target: "point39" }
+    ]
+  },
+  point39: {
+    skyId: "#pano39",
+    yaw: -5,
+    imageKey: "39",
+    hotspots: [
+      { id: "hs77", position: "3 -10 60", rotation: "0 180 0", scale: "6 6 6", target: "point38" },
+      { id: "hs78", position: "0 -6 -50", rotation: "0 180 0", scale: "4 4 4", target: "point40" }
+    ]
+  },
+  point40: {
+    skyId: "#pano40",
+    yaw: 0,
+    imageKey: "40",
+    hotspots: [
+      { id: "hs79", position: "60 -10 1", rotation: "0 90 0", scale: "6 6 6", target: "point39" },
+      { id: "hs80", position: "0 -6 -50", rotation: "0 180 0", scale: "4 4 4", target: "point41" }
+    ]
+  },
+  point41: {
+    skyId: "#pano41",
+    yaw: 82,
+    imageKey: "41",
+    hotspots: [
+      { id: "hs81", position: "-5 -10 100", rotation: "0 180 0", scale: "6 6 6", target: "point40" },
+      { id: "hs82", position: "0 -6 -60", rotation: "0 180 0", scale: "4 4 4", target: "point42" }
+    ]
+  },
+  point42: {
+    skyId: "#pano42",
+    yaw: 0,
+    imageKey: "42",
+    hotspots: [
+      { id: "hs81", position: "-5 -10 100", rotation: "0 180 0", scale: "6 6 6", target: "point41" },
+      { id: "hs82", position: "0 -6 -60", rotation: "0 180 0", scale: "4 4 4", target: "point43" }
+    ]
+  },
+  point43: {
+    skyId: "#pano43",
+    yaw: 0,
+    imageKey: "43",
+    hotspots: [
+      { id: "hs83", position: "-2 -10 80", rotation: "0 180 0", scale: "6 6 6", target: "point42" },
+      { id: "hs84", position: "10 -6 -120", rotation: "0 180 0", scale: "10 10 10", target: "point26" }
+    ]
+  }
+};
 
-        hotspotsContainer.appendChild(el);
-      });
-      
-      // Apply counter-rotation to stabilize hotspots
-      updateHotspotStabilization();
+/* ===========================
+   LOAD NODE
+=========================== */
+async function loadNode(nodeId) {
+  if (isLoading) return;
+  const node = nodes[nodeId];
+  if (!node) return;
+
+  isLoading = true;
+  loadingOverlay.style.display = "flex";
+
+  // Set sky texture
+  sky.setAttribute("src", node.skyId);
+  
+  // Build hotspots for this node
+  buildHotspots(node);
+
+  setTimeout(() => {
+    loadingOverlay.style.display = "none";
+    isLoading = false;
+    currentNodeId = nodeId;
+    
+    // Reset turnRoot rotation when loading new node
+    if (turnRoot && turnRoot.components['thumbstick-rig-turn']) {
+      turnRoot.components['thumbstick-rig-turn'].yaw = 0;
+      turnRoot.object3D.rotation.y = 0;
     }
+  }, 300);
+}
 
-    // Apply counter-rotation to keep hotspots visually stable
-    function updateHotspotStabilization() {
-      const turnRotation = turnRoot.getAttribute("rotation");
-      const currentYaw = turnRotation.y;
-      
-      // Apply opposite rotation to hotspot stabilizer
-      hotspotStabilizer.setAttribute("rotation", `0 ${-currentYaw} 0`);
-      
-      // Reparent hotspots to stabilizer
-      Array.from(hotspotsContainer.children).forEach(hotspot => {
-        hotspotStabilizer.appendChild(hotspot);
-      });
-    }
+/* ===========================
+   HOTSPOTS
+=========================== */
+function buildHotspots(node) {
+  hotspotsContainer.innerHTML = "";
+  currentHotspots = [];
 
-    // Thumbstick rotation handler
-    function setupThumbstickControls() {
-      // Handle thumbstick input
-      scene.addEventListener("thumbstickmoved", (evt) => {
-        const { x, y } = evt.detail;
-        
-        // Apply deadzone
-        if (Math.abs(x) < DEADZONE) {
-          turnSpeed = 0;
-          isTurning = false;
-          return;
-        }
-        
-        isTurning = true;
-        turnSpeed = -x * TURN_SPEED; // Negative because thumbstick direction feels more natural
-        
-        // Reset lastTime for animation frame
-        lastTime = performance.now();
-      });
-      
-      // Stop turning when thumbstick returns to center
-      scene.addEventListener("thumbstickdown", (evt) => {
-        // This event fires when thumbstick is pressed down, not when moved
-      });
-      
-      scene.addEventListener("thumbstickup", (evt) => {
-        turnSpeed = 0;
-        isTurning = false;
-      });
-      
-      // Animation loop for smooth rotation
-      function animateTurn(timestamp) {
-        if (isTurning && turnSpeed !== 0) {
-          const deltaTime = lastTime ? (timestamp - lastTime) / 1000 : 0;
-          lastTime = timestamp;
-          
-          if (deltaTime > 0) {
-            const currentRotation = turnRoot.getAttribute("rotation");
-            const newYaw = currentRotation.y + (turnSpeed * deltaTime);
-            turnRoot.setAttribute("rotation", `0 ${newYaw} 0`);
-            
-            // Update hotspot stabilization
-            updateHotspotStabilization();
-          }
-        }
-        
-        requestAnimationFrame(animateTurn);
+  node.hotspots.forEach(h => {
+    const el = document.createElement("a-image");
+    el.setAttribute("src", "#navArrow");
+    el.setAttribute("position", h.position);
+    
+    // Store the base rotation from config
+    const baseRotation = h.rotation;
+    const baseRotationValues = baseRotation.split(' ').map(Number);
+    
+    // Set initial rotation
+    el.object3D.rotation.set(
+      THREE.MathUtils.degToRad(baseRotationValues[0]),
+      THREE.MathUtils.degToRad(baseRotationValues[1]),
+      THREE.MathUtils.degToRad(baseRotationValues[2])
+    );
+    
+    el.setAttribute("scale", h.scale);
+    el.setAttribute("class", "clickable");
+
+    // Add animation for visual feedback
+    el.setAttribute("animation", {
+      property: "scale",
+      from: h.scale,
+      to: parseFloat(h.scale.split(' ')[0]) * 1.2 + " " + 
+          parseFloat(h.scale.split(' ')[1]) * 1.2 + " " + 
+          parseFloat(h.scale.split(' ')[2]) * 1.2,
+      dir: "alternate",
+      dur: 1000,
+      loop: true,
+      easing: "easeInOutSine"
+    });
+
+    // Store hotspot data for counter-rotation
+    currentHotspots.push({
+      element: el,
+      baseRotation: h.rotation,
+      target: h.target
+    });
+
+    // Click event for both desktop and VR
+    el.addEventListener("click", () => {
+      if (!isLoading) {
+        console.log("Hotspot clicked, loading:", h.target);
+        loadNode(h.target);
       }
-      
-      requestAnimationFrame(animateTurn);
-    }
+    });
 
-    // central function to switch nodes (panorama)
-    function loadNode(nodeId) {
-      const node = nodes[nodeId];
-      if (!node) {
-        console.warn("node not found:", nodeId);
+    hotspotsContainer.appendChild(el);
+  });
+  
+  // Update hotspot rotations immediately
+  updateHotspotRotations();
+}
+
+/* ===========================
+   HOTSPOT ROTATION UPDATER
+=========================== */
+function updateHotspotRotations() {
+  if (!turnRoot || currentHotspots.length === 0) return;
+  
+  // Get current turnRoot rotation
+  const turnYaw = turnRoot.object3D.rotation.y;
+  
+  // Apply counter-rotation to each hotspot
+  currentHotspots.forEach(hotspot => {
+    if (hotspot.element.object3D) {
+      const baseValues = hotspot.baseRotation.split(' ').map(Number);
+      
+      // Counter-rotate by subtracting turnRoot's yaw
+      const currentYaw = baseValues[1] - THREE.MathUtils.radToDeg(turnYaw);
+      
+      hotspot.element.object3D.rotation.set(
+        THREE.MathUtils.degToRad(baseValues[0]),
+        THREE.MathUtils.degToRad(currentYaw),
+        THREE.MathUtils.degToRad(baseValues[2])
+      );
+    }
+  });
+}
+
+// Make updateHotspotRotations globally accessible for the thumbstick component
+window.updateHotspotRotations = updateHotspotRotations;
+
+/* ===========================
+   INIT
+=========================== */
+scene.addEventListener("loaded", () => {
+  // Check for URL parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  const imageKey = urlParams.get('image');
+  
+  if (imageKey) {
+    // Find node with matching imageKey
+    for (const nodeId in nodes) {
+      if (nodes[nodeId].imageKey === imageKey) {
+        loadNode(nodeId);
         return;
       }
-
-      currentNodeId = nodeId;
-      // set the sky texture
-      sky.setAttribute("src", node.skyId);
-
-      // reset any extra yaw and apply sky rotation
-      extraYaw = 0;
-      updateSkyRotation();
-
-      // Reset turnRoot rotation when loading new node
-      turnRoot.setAttribute("rotation", "0 0 0");
-      
-      // Update hotspot stabilization
-      updateHotspotStabilization();
-
-      // rotate the camera to face the node's base yaw (optional)
-      // If you prefer not to rotate camera automatically, comment out the next line
-      camera.setAttribute("rotation", `0 ${node.yaw} 0`);
-
-      // build hotspots for the newly loaded node
-      buildHotspots(nodeId);
-
-      // log current node to console
-      console.log("yo you're now at ➜", currentNodeId);
     }
+  }
+  
+  // Default load
+  loadNode("point1");
+});
 
-    // convenience function — kept for compatibility if other code calls loadPoint()
-    function loadPoint(pointName) {
-      loadNode(pointName);
+/* ===========================
+   MAKE FUNCTIONS GLOBALLY AVAILABLE
+=========================== */
+window.exitVRTour = exitVRTour;
+window.loadNode = loadNode;
+window.loadByImageKey = function(imageKey) {
+  for (const nodeId in nodes) {
+    if (nodes[nodeId].imageKey === imageKey) {
+      loadNode(nodeId);
+      return true;
     }
+  }
+  return false;
+};
+window.getPanoramaNodes = () => nodes;
 
-    // Initialize
-    loadNode(currentNodeId);
-    
-    // Setup thumbstick controls after scene is loaded
-    scene.addEventListener("loaded", () => {
-      setupThumbstickControls();
-    });
-  </script>
+// Also allow exit with Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    exitVRTour();
+  }
+});
+
+// Add click sound for better feedback
+const clickSound = new Audio('https://cdn.aframe.io/360-image-gallery-boilerplate/audio/click.ogg');
+clickSound.volume = 0.5;
+
+// Enhance cursor interaction
+const cursor = document.querySelector('[cursor]');
+if (cursor) {
+  cursor.addEventListener('click', (evt) => {
+    if (evt.detail.intersectedEl && evt.detail.intersectedEl.classList.contains('clickable')) {
+      clickSound.currentTime = 0;
+      clickSound.play().catch(e => console.log("Audio play failed:", e));
+    }
+  });
+}
+</script>
 </body>
-
 </html>
-
-
