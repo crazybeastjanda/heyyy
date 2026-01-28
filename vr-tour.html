@@ -102,6 +102,31 @@
     .vr-mode #exitVRBtn {
       display: none;
     }
+
+    /* VR Controller Styles */
+    .controller-ray {
+      opacity: 0.5;
+    }
+
+    .vr-mode .controller-ray {
+      opacity: 0.8;
+    }
+
+    /* Hotspot VR hover effect */
+    .hotspot-vr-hover {
+      animation: vrPulse 1s infinite alternate;
+    }
+
+    @keyframes vrPulse {
+      from {
+        opacity: 1;
+        transform: scale(1);
+      }
+      to {
+        opacity: 0.8;
+        transform: scale(1.1);
+      }
+    }
   </style>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -118,8 +143,14 @@
     <i class="fas fa-sign-out-alt"></i> Exit VR Tour
   </button>
 
-  <a-scene webxr="referenceSpaceType: local-floor" vr-mode-ui="enabled: true" cursor="rayOrigin: mouse" 
-    raycaster="objects: .clickable">
+  <a-scene webxr="
+    requiredFeatures: local-floor;
+    optionalFeatures: hand-tracking, hit-test;
+    referenceSpaceType: local-floor;
+  " 
+  vr-mode-ui="enabled: true" 
+  cursor="rayOrigin: mouse" 
+  raycaster="objects: .clickable">
 
     <!-- All images lazy loaded -->
     <a-assets timeout="30000">
@@ -210,6 +241,20 @@
     // Track loaded images to prevent duplicate loading
     const loadedImages = new Set();
 
+    // VR Controller state for smooth rotation
+    let leftController = null;
+    let rightController = null;
+    let isLeftControllerConnected = false;
+    let isRightControllerConnected = false;
+
+    // Rotation speed (degrees per second)
+    const ROTATION_SPEED = 50;
+    let currentRotationSpeed = 0;
+    let lastTime = 0;
+
+    // Thumbstick deadzone to prevent drift
+    const THUMBSTICK_DEADZONE = 0.15;
+
     // Exit VR function
     function exitVRTour() {
       console.log("Exiting VR Tour and returning to index.html...");
@@ -237,6 +282,251 @@
       document.body.classList.remove("vr-mode");
     });
 
+    // ===========================
+    // VR CONTROLLER JOYSTICK HANDLING
+    // ===========================
+
+    // WebXR controller setup
+    function setupWebXRControllers() {
+      console.log("Setting up WebXR controllers...");
+      
+      // Get controller entities
+      leftController = document.querySelector('#left-controller');
+      rightController = document.querySelector('#right-controller');
+      
+      // Create controller entities if they don't exist
+      if (!leftController) {
+        leftController = document.createElement('a-entity');
+        leftController.id = 'left-controller';
+        leftController.setAttribute('hand-controls', 'hand: left; handModelStyle: lowPoly; color: #4CC3D9');
+        leftController.setAttribute('vive-controls', 'hand: left');
+        leftController.setAttribute('oculus-touch-controls', 'hand: left');
+        leftController.setAttribute('windows-motion-controls', 'hand: left');
+        leftController.setAttribute('raycaster', {
+          objects: '.clickable',
+          showLine: true,
+          lineColor: '#4CC3D9',
+          lineOpacity: 0.5
+        });
+        leftController.classList.add('controller-ray');
+        scene.appendChild(leftController);
+      }
+      
+      if (!rightController) {
+        rightController = document.createElement('a-entity');
+        rightController.id = 'right-controller';
+        rightController.setAttribute('hand-controls', 'hand: right; handModelStyle: lowPoly; color: #4CC3D9');
+        rightController.setAttribute('vive-controls', 'hand: right');
+        rightController.setAttribute('oculus-touch-controls', 'hand: right');
+        rightController.setAttribute('windows-motion-controls', 'hand: right');
+        rightController.setAttribute('raycaster', {
+          objects: '.clickable',
+          showLine: true,
+          lineColor: '#4CC3D9',
+          lineOpacity: 0.5
+        });
+        rightController.classList.add('controller-ray');
+        scene.appendChild(rightController);
+      }
+      
+      // Add controller listeners
+      addControllerListeners(leftController, 'left');
+      addControllerListeners(rightController, 'right');
+      
+      // Animation loop for smooth rotation
+      startAnimationLoop();
+    }
+
+    function addControllerListeners(controller, hand) {
+      // Thumbstick movement events (WebXR standard)
+      controller.addEventListener('thumbstickmoved', (event) => {
+        handleThumbstickMove(event, hand);
+      });
+      
+      // Oculus Touch specific events (fallback)
+      controller.addEventListener('axismove', (event) => {
+        if (event.detail.axis && event.detail.axis.length >= 2) {
+          // Axis 0 and 1 are typically thumbstick on Oculus
+          const x = event.detail.axis[0] || 0;
+          const y = event.detail.axis[1] || 0;
+          
+          // Only process if we're in VR mode
+          if (scene.is('vr-mode')) {
+            handleThumbstickMove({
+              detail: { x, y },
+              target: controller
+            }, hand);
+          }
+        }
+      });
+      
+      // Vive wand events (fallback)
+      controller.addEventListener('trackpaddown', (event) => {
+        if (scene.is('vr-mode')) {
+          // Handle trackpad as joystick
+          const touchX = event.detail.x || 0;
+          const touchY = event.detail.y || 0;
+          
+          handleThumbstickMove({
+            detail: { x: touchX, y: touchY },
+            target: controller
+          }, hand);
+        }
+      });
+      
+      controller.addEventListener('trackpadup', () => {
+        if (scene.is('vr-mode')) {
+          // Reset rotation when trackpad is released
+          currentRotationSpeed = 0;
+        }
+      });
+      
+      // Trigger events (for hotspot interaction)
+      controller.addEventListener('triggerdown', () => {
+        if (scene.is('vr-mode')) {
+          // Get raycaster component
+          const raycaster = controller.components.raycaster;
+          if (raycaster) {
+            const intersections = raycaster.intersections;
+            if (intersections && intersections.length > 0) {
+              const intersectedEl = intersections[0].object.el;
+              if (intersectedEl && intersectedEl.classList.contains('clickable')) {
+                // Emit click event
+                intersectedEl.emit('click');
+                
+                // Visual feedback on controller
+                if (controller.getAttribute('material')) {
+                  controller.setAttribute('material', 'color', '#FF4757');
+                  setTimeout(() => {
+                    controller.setAttribute('material', 'color', '#4CC3D9');
+                  }, 200);
+                }
+                
+                // Haptic feedback if available
+                if (controller.components.haptics) {
+                  controller.components.haptics.pulse(0.1, 50);
+                }
+              }
+            }
+          }
+        }
+      });
+      
+      // Controller connected/disconnected events
+      controller.addEventListener('controllerconnected', (event) => {
+        console.log(`${hand} controller connected:`, event.detail.name);
+        if (hand === 'left') isLeftControllerConnected = true;
+        if (hand === 'right') isRightControllerConnected = true;
+        
+        // Add visual feedback
+        if (controller.getAttribute('material')) {
+          controller.setAttribute('material', 'color', '#00FF00');
+          setTimeout(() => {
+            controller.setAttribute('material', 'color', '#4CC3D9');
+          }, 500);
+        }
+      });
+      
+      controller.addEventListener('controllerdisconnected', (event) => {
+        console.log(`${hand} controller disconnected`);
+        if (hand === 'left') isLeftControllerConnected = false;
+        if (hand === 'right') isRightControllerConnected = false;
+      });
+      
+      // Thumbstick released event
+      controller.addEventListener('thumbstickmoved', (event) => {
+        const x = event.detail.x || 0;
+        const y = event.detail.y || 0;
+        const magnitude = Math.sqrt(x * x + y * y);
+        
+        if (magnitude < THUMBSTICK_DEADZONE) {
+          currentRotationSpeed = 0;
+        }
+      });
+    }
+
+    function handleThumbstickMove(event, hand) {
+      // Only process if we're in VR mode
+      if (!scene.is('vr-mode')) return;
+      
+      const x = event.detail.x || 0;
+      const y = event.detail.y || 0;
+      
+      // Calculate magnitude
+      const magnitude = Math.sqrt(x * x + y * y);
+      
+      // Apply deadzone
+      if (magnitude < THUMBSTICK_DEADZONE) {
+        currentRotationSpeed = 0;
+        return;
+      }
+      
+      // Determine direction based on X-axis (horizontal movement)
+      // Negative X = left rotation, Positive X = right rotation
+      let rotationDirection = 0;
+      
+      if (Math.abs(x) > Math.abs(y)) {
+        // Horizontal movement dominant
+        rotationDirection = x > 0 ? 1 : -1;
+      } else {
+        // Vertical movement - could be used for forward/backward if needed
+        // For now, we'll ignore or use for different control
+        rotationDirection = 0;
+      }
+      
+      // Scale rotation speed based on how far the thumbstick is pushed
+      const intensity = (magnitude - THUMBSTICK_DEADZONE) / (1 - THUMBSTICK_DEADZONE);
+      currentRotationSpeed = rotationDirection * ROTATION_SPEED * intensity;
+      
+      // Optional: Add haptic feedback for stronger movement
+      if (event.target.components && event.target.components.haptics && intensity > 0.7) {
+        event.target.components.haptics.pulse(0.1, 50);
+      }
+    }
+
+    function startAnimationLoop() {
+      lastTime = performance.now();
+      
+      function animate(time) {
+        const deltaTime = (time - lastTime) / 1000; // Convert to seconds
+        lastTime = time;
+        
+        // Apply rotation if we have speed
+        if (Math.abs(currentRotationSpeed) > 0.01) {
+          extraYaw += currentRotationSpeed * deltaTime;
+          updateSkyRotation();
+        }
+        
+        requestAnimationFrame(animate);
+      }
+      
+      requestAnimationFrame(animate);
+    }
+
+    // Update hotspot for VR interaction
+    function updateHotspotForVR(hotspot) {
+      // Ensure hotspot has proper VR interaction attributes
+      hotspot.setAttribute('class', 'clickable');
+      hotspot.setAttribute('visible', true);
+      
+      // Store original scale for hover effects
+      const scale = hotspot.getAttribute('scale');
+      hotspot.setAttribute('data-original-scale', scale);
+      
+      // Add hover state for VR
+      hotspot.addEventListener('mouseenter', () => {
+        if (scene.is('vr-mode')) {
+          hotspot.classList.add('hotspot-vr-hover');
+        }
+      });
+      
+      hotspot.addEventListener('mouseleave', () => {
+        if (scene.is('vr-mode')) {
+          hotspot.classList.remove('hotspot-vr-hover');
+        }
+      });
+    }
+
     // Scene loaded handler
     scene.addEventListener("loaded", () => {
       canvas = scene.canvas;
@@ -256,6 +546,22 @@
         console.log("Starting with default panorama");
         loadNode("point1");
       }
+      
+      // Set up VR controllers when scene loads
+      setTimeout(setupWebXRControllers, 1000);
+      
+      // Also set up controllers when entering VR
+      scene.addEventListener('enter-vr', () => {
+        console.log("VR mode entered - initializing controllers");
+        currentRotationSpeed = 0; // Reset rotation when entering VR
+        setTimeout(setupWebXRControllers, 500);
+      });
+      
+      // Clean up when exiting VR
+      scene.addEventListener('exit-vr', () => {
+        console.log("VR mode exited - resetting rotation");
+        currentRotationSpeed = 0;
+      });
     });
 
     function hideLoadingOverlay() {
@@ -749,6 +1055,9 @@
           }
         });
         
+        // Setup VR interactions
+        updateHotspotForVR(hotspot);
+        
         hotspotsContainer.appendChild(hotspot);
       });
       
@@ -824,6 +1133,26 @@
       return false;
     }
 
+    // Add keyboard controls for testing (optional)
+    document.addEventListener('keydown', (e) => {
+      if (scene.is('vr-mode')) return; // Don't interfere with VR controls
+      
+      switch(e.key) {
+        case 'ArrowLeft':
+          extraYaw += 5;
+          updateSkyRotation();
+          break;
+        case 'ArrowRight':
+          extraYaw -= 5;
+          updateSkyRotation();
+          break;
+        case 'r': // Reset rotation
+          extraYaw = 0;
+          updateSkyRotation();
+          break;
+      }
+    });
+
     // Make the loadByImageKey function globally accessible
     window.loadByImageKey = loadByImageKey;
     
@@ -842,4 +1171,3 @@
 </body>
 
 </html>
-
